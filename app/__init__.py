@@ -1,0 +1,1 @@
+"""Expense categorization application package."""
