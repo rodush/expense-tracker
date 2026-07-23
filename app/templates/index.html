@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Expense Categorizer</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 2rem; max-width: 900px; }
+      .panel { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+      table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+      th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+      button { padding: 0.6rem 1rem; cursor: pointer; }
+      .hidden { display: none; }
+      .error { color: #b00020; margin-top: 1rem; }
+    </style>
+  </head>
+  <body>
+    <div class="panel">
+      <h1>Expense Categorizer MVP</h1>
+      <p>Upload a CSV, XLS, or XLSX expense file to categorize descriptions with Gemini.</p>
+      <input id="fileInput" type="file" accept=".csv,.xls,.xlsx" />
+      <button id="uploadButton" type="button">Upload & Categorize</button>
+      <div id="loading" class="hidden">Processing...</div>
+      <div id="error" class="error hidden"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Preview</h2>
+      <table id="resultsTable">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Amount</th>
+            <th>Description</th>
+            <th>Who</th>
+            <th>Category</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <a id="downloadLink" class="hidden">Download categorized file</a>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

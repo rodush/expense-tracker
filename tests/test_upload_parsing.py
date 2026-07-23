@@ -14,9 +14,9 @@ client = TestClient(app)
 
 def test_upload_accepts_csv_and_adds_category_column() -> None:
     csv_content = (
-        "date,amount,description,purchaser\n"
-        "2026-07-01,15.50,Coffee Shop,Jane Doe\n"
-        "2026-07-02,48.00,Office supplies,John Smith\n"
+        "date,amount,description\n"
+        "2026-07-01,15.50,PAS543 Coffee Shop\n"
+        "2026-07-02,48.00,KAARTNUMMER: **5006 Office supplies\n"
     )
 
     response = client.post(
@@ -32,9 +32,11 @@ def test_upload_accepts_csv_and_adds_category_column() -> None:
         "date",
         "amount",
         "description",
-        "purchaser",
+        "who",
         "category",
     ]
+    assert payload["preview"][0]["who"] == "Roman"
+    assert payload["preview"][1]["who"] == "Oksana"
 
 
 def test_upload_rejects_unsupported_file_type() -> None:
