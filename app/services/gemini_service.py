@@ -111,17 +111,17 @@ def _call_gemini_batch(batch: list[dict[str, Any]]) -> dict[int, str] | None:
         return None
 
     try:
-        parsed_payload = json.loads(cleaned_text)
+        parsed_payload: list[dict[str, Any]] = json.loads(cleaned_text)
     except json.JSONDecodeError:
         return None
 
-    if not isinstance(parsed_payload, list):
-        return None
+    # if not isinstance(parsed_payload, list):
+    #     return None
 
     category_by_index: dict[int, str] = {}
     for item in parsed_payload:
-        if not isinstance(item, dict):
-            continue
+        # if not isinstance(item, dict):
+        #     continue
         record_index = item.get("record_index")
         category = item.get("category")
         if isinstance(record_index, int) and isinstance(category, str):
@@ -131,7 +131,7 @@ def _call_gemini_batch(batch: list[dict[str, Any]]) -> dict[int, str] | None:
 
 
 def _classify_batch(records: list[Mapping[str, Any]], start_index: int) -> dict[int, str]:
-    batch_payload = [
+    batch_payload: list[dict[str, Any]] = [
         {
             "record_index": start_index + offset,
             "description": str(record.get("description", "") or "").strip(),
