@@ -27,7 +27,7 @@ This repository is a Python-based project. Treat all changes as production-adjac
 - Avoid unsafe filesystem writes, shell execution, or network calls outside the explicitly requested scope.
 
 ### 4. Python-specific guidance
-- Use Python v3.12.
+- Use Python v3.14.
 - Use uv as package manager.
 - Follow PEP 8 and existing project formatting standards.
 - Prefer type hints, clear docstrings, and readable naming where appropriate.
