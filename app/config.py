@@ -25,7 +25,9 @@ class Settings:
     gemini_api_key: str | None = os.getenv("GEMINI_API_KEY")
     allowed_categories: tuple[str, ...] = tuple(
         category.strip()
-        for category in os.getenv("CATEGORIES", "Grocery,Transport,Utilities,Shopping,Other").split(",")
+        for category in os.getenv(
+            "CATEGORIES", "Grocery,Transport,Utilities,Shopping,Other"
+        ).split(",")
         if category.strip()
     )
 

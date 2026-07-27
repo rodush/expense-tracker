@@ -26,6 +26,7 @@ def test_missing_required_columns_returns_clear_validation_error() -> None:
     assert "missing required columns" in response.json()["detail"].lower()
     assert "description" in response.json()["detail"].lower()
 
+
 def test_environment_file_is_loaded_into_process_environment() -> None:
     assert settings.allowed_categories
     assert "Other" in settings.allowed_categories
@@ -34,7 +35,10 @@ def test_environment_file_is_loaded_into_process_environment() -> None:
 
 def test_category_settings_are_loaded_from_config() -> None:
     assert settings.allowed_categories
-    assert normalize_category(settings.allowed_categories[0]) == settings.allowed_categories[0]
+    assert (
+        normalize_category(settings.allowed_categories[0])
+        == settings.allowed_categories[0]
+    )
     assert "Other" in settings.allowed_categories
 
 
@@ -70,10 +74,7 @@ def test_ui_route_serves_the_browser_page() -> None:
 
 
 def test_upload_returns_downloadable_csv_file() -> None:
-    csv_content = (
-        "date,amount,description\n"
-        "2026-07-01,15.50,PAS543 Coffee Shop\n"
-    )
+    csv_content = "date,amount,description\n2026-07-01,15.50,PAS543 Coffee Shop\n"
 
     response = client.post(
         "/upload",

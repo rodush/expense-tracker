@@ -42,10 +42,49 @@ def _heuristic_category(description: str) -> str:
     description_lower = description.lower()
 
     category_keywords = {
-        "Food": ["coffee", "restaurant", "cafe", "food", "lunch", "dinner", "grocer", "grocery", "bakery"],
-        "Transport": ["uber", "lyft", "taxi", "train", "metro", "fuel", "petrol", "parking", "bus", "rail"],
-        "Utilities": ["electricity", "water", "gas", "internet", "phone", "utility", "mobile", "bill"],
-        "Shopping": ["amazon", "shop", "store", "market", "retail", "purchase", "clothes", "electronics"],
+        "Food": [
+            "coffee",
+            "restaurant",
+            "cafe",
+            "food",
+            "lunch",
+            "dinner",
+            "grocer",
+            "grocery",
+            "bakery",
+        ],
+        "Transport": [
+            "uber",
+            "lyft",
+            "taxi",
+            "train",
+            "metro",
+            "fuel",
+            "petrol",
+            "parking",
+            "bus",
+            "rail",
+        ],
+        "Utilities": [
+            "electricity",
+            "water",
+            "gas",
+            "internet",
+            "phone",
+            "utility",
+            "mobile",
+            "bill",
+        ],
+        "Shopping": [
+            "amazon",
+            "shop",
+            "store",
+            "market",
+            "retail",
+            "purchase",
+            "clothes",
+            "electronics",
+        ],
     }
 
     for category, keywords in category_keywords.items():
@@ -130,7 +169,9 @@ def _call_gemini_batch(batch: list[dict[str, Any]]) -> dict[int, str] | None:
     return category_by_index or None
 
 
-def _classify_batch(records: list[Mapping[str, Any]], start_index: int) -> dict[int, str]:
+def _classify_batch(
+    records: list[Mapping[str, Any]], start_index: int
+) -> dict[int, str]:
     batch_payload: list[dict[str, Any]] = [
         {
             "record_index": start_index + offset,
@@ -142,7 +183,9 @@ def _classify_batch(records: list[Mapping[str, Any]], start_index: int) -> dict[
     fallback_map: dict[int, str] = {}
     for offset, record in enumerate(records):
         description = str(record.get("description", "") or "").strip()
-        fallback_map[start_index + offset] = normalize_category(_heuristic_category(description))
+        fallback_map[start_index + offset] = normalize_category(
+            _heuristic_category(description)
+        )
 
     if not batch_payload:
         return {}
@@ -172,7 +215,12 @@ def categorize_dataframe(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, An
         for offset, row in enumerate(chunk):
             record_index = start_index + offset
             normalized_row = dict(row)
-            normalized_row["category"] = category_by_index.get(record_index, normalize_category(_heuristic_category(str(row.get("description", "") or "").strip())))
+            normalized_row["category"] = category_by_index.get(
+                record_index,
+                normalize_category(
+                    _heuristic_category(str(row.get("description", "") or "").strip())
+                ),
+            )
             categorized_rows.append(normalized_row)
 
     return categorized_rows

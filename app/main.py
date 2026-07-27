@@ -12,10 +12,15 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.services.gemini_service import categorize_dataframe, determine_who_from_description
+from app.services.gemini_service import (
+    categorize_dataframe,
+    determine_who_from_description,
+)
 
 app = FastAPI(title="Expense Categorizer", version="0.1.0")
-app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+app.mount(
+    "/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static"
+)
 
 ALLOWED_EXTENSIONS = {".csv", ".xls", ".xlsx"}
 REQUIRED_COLUMNS = {"date", "amount", "description"}
@@ -70,7 +75,9 @@ async def upload_expense_file(file: UploadFile = File(...)) -> dict[str, Any]:
     try:
         dataframe = _load_spreadsheet(raw_content, file_extension)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Unable to parse file content: {exc}") from exc
+        raise HTTPException(
+            status_code=400, detail=f"Unable to parse file content: {exc}"
+        ) from exc
 
     dataframe = dataframe.rename(columns=lambda column: str(column).strip().lower())
 
@@ -81,14 +88,20 @@ async def upload_expense_file(file: UploadFile = File(...)) -> dict[str, Any]:
             detail=f"Missing required columns: {', '.join(missing_columns)}",
         )
 
-    dataframe["who"] = dataframe["description"].fillna("").astype(str).apply(determine_who_from_description)
+    dataframe["who"] = (
+        dataframe["description"]
+        .fillna("")
+        .astype(str)
+        .apply(determine_who_from_description)
+    )
 
     category_column_added = "category" not in dataframe.columns
     if category_column_added:
         dataframe["category"] = "Other"
 
     normalized_rows: list[dict[str, Any]] = [
-        {str(key): value for key, value in row.items()} for row in dataframe.to_dict(orient="records")
+        {str(key): value for key, value in row.items()}
+        for row in dataframe.to_dict(orient="records")
     ]
     categorized_rows = categorize_dataframe(normalized_rows)
     dataframe = dataframe.assign(category=[row["category"] for row in categorized_rows])
