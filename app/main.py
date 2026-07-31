@@ -112,7 +112,7 @@ async def upload_expense_file(file: UploadFile = File(...)) -> dict[str, Any]:
     dataframe.to_csv(output_path, index=False)
 
     return {
-        "row_count": int(len(dataframe)),
+        "row_count": len(dataframe),
         "category_column_added": category_column_added,
         "columns": list(dataframe.columns),
         "preview": dataframe.to_dict(orient="records"),

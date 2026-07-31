@@ -5,11 +5,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from fastapi.testclient import TestClient
+
 from app.config import settings
 from app.main import app
 from app.services import gemini_service
 from app.services.gemini_service import normalize_category
-from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

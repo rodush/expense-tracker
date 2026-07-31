@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Iterable, Mapping, cast
+from collections.abc import Iterable, Mapping
+from typing import Any, cast
 
 try:
     import google.generativeai as genai  # type: ignore[reportMissingImports]
@@ -10,7 +11,9 @@ except ImportError:
     genai = None
 
 try:
-    from google.generativeai import types as genai_types  # type: ignore[reportMissingImports]
+    from google.generativeai import (
+        types as genai_types,  # type: ignore[reportMissingImports]
+    )
 except ImportError:
     genai_types = None
 
