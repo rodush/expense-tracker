@@ -47,3 +47,19 @@ def test_upload_rejects_unsupported_file_type() -> None:
 
     assert response.status_code == 400
     assert "unsupported" in response.json()["detail"].lower()
+
+
+def test_upload_rejects_path_traversal_filename() -> None:
+    response = client.post(
+        "/upload",
+        files={
+            "file": (
+                "../evil.csv",
+                b"date,amount,description\n2026-07-01,15.50,Coffee\n",
+                "text/csv",
+            )
+        },
+    )
+
+    assert response.status_code == 400
+    assert "invalid filename" in response.json()["detail"].lower()
