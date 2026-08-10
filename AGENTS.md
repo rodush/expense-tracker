@@ -47,6 +47,13 @@ This repository is a Python-based project. Treat all changes as production-adjac
 - Run the relevant tests for any Python change when feasible.
 - When fixing an issue make sure the broken test is created first, and make sure it passes after the fix is implemented.
 - Do not claim tests pass unless they were actually run.
+- Run tests from the local directory where `pytest` is installed in the `.venv` with `uv`:
+
+Run command while in the workspace directory (expense-tracker):
+
+```sh
+uv run pytest
+```
 
 ### 7. Change discipline
 - Do not make unrelated cleanup changes.
