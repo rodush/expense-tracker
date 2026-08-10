@@ -24,8 +24,16 @@ app.mount(
 
 ALLOWED_EXTENSIONS = {".csv", ".xls", ".xlsx"}
 REQUIRED_COLUMNS = {"date", "amount", "description"}
+MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
 UI_TEMPLATE_FILE = Path(__file__).parent / "templates" / "index.html"
 DOWNLOADS_DIR = Path.cwd() / ".tmp"
+
+
+def _is_safe_filename(filename: str | None) -> bool:
+    if not filename:
+        return False
+    candidate = Path(filename).name
+    return candidate == filename and candidate not in {"", ".", ".."}
 
 
 def _load_spreadsheet(raw_content: bytes, file_extension: str) -> pd.DataFrame:
@@ -63,6 +71,9 @@ async def upload_expense_file(file: UploadFile = File(...)) -> dict[str, Any]:
     if file.filename is None:
         raise HTTPException(status_code=400, detail="A file name is required.")
 
+    if not _is_safe_filename(file.filename):
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+
     file_extension = Path(file.filename).suffix.lower()
     if file_extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(
@@ -71,6 +82,11 @@ async def upload_expense_file(file: UploadFile = File(...)) -> dict[str, Any]:
         )
 
     raw_content = await file.read()
+    if len(raw_content) > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail="Uploaded file is too large.",
+        )
 
     try:
         dataframe = _load_spreadsheet(raw_content, file_extension)
