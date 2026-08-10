@@ -66,6 +66,27 @@ def test_normalize_category_rejects_unknown_values_and_falls_back_to_other() -> 
     assert normalize_category("Mystery Category") == "Other"
 
 
+def test_categorize_dataframe_falls_back_when_gemini_is_unavailable(monkeypatch) -> None:
+    monkeypatch.setattr(gemini_service, "_call_gemini_batch", lambda batch: None)
+
+    rows = [{"description": "Coffee at the cafe"}]
+    categorized_rows = gemini_service.categorize_dataframe(rows)
+
+    assert categorized_rows[0]["category"] == "Other"
+
+
+def test_categorize_dataframe_falls_back_when_gemini_call_raises(monkeypatch) -> None:
+    def explode(batch: list[dict[str, object]]) -> dict[int, str]:
+        raise RuntimeError("transient gemini failure")
+
+    monkeypatch.setattr(gemini_service, "_call_gemini_batch", explode)
+
+    rows = [{"description": "Coffee at the cafe"}]
+    categorized_rows = gemini_service.categorize_dataframe(rows)
+
+    assert categorized_rows[0]["category"] == "Other"
+
+
 def test_ui_route_serves_the_browser_page() -> None:
     response = client.get("/ui")
 

@@ -193,7 +193,11 @@ def _classify_batch(
     if not batch_payload:
         return {}
 
-    categorized_by_index = _call_gemini_batch(batch_payload)
+    try:
+        categorized_by_index = _call_gemini_batch(batch_payload)
+    except Exception:
+        categorized_by_index = None
+
     if categorized_by_index:
         return categorized_by_index
 
