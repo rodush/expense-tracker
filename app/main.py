@@ -5,7 +5,7 @@ import os
 import uuid
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -71,7 +71,9 @@ def get_ui() -> FileResponse:
 
 
 @app.post("/upload")
-async def upload_expense_file(file: UploadFile = File(...)) -> dict[str, Any]:
+async def upload_expense_file(
+    file: Annotated[UploadFile, File(...)],
+) -> dict[str, Any]:
     """Accept an expense spreadsheet, normalize its columns, and return metadata."""
     logger.info("Upload requested", extra={"file_name": file.filename})
     if file.filename is None:
