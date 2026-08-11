@@ -59,6 +59,8 @@ uv run pytest
 - Do not make unrelated cleanup changes.
 - Do not rewrite large sections of code without a clear reason.
 - If a request is ambiguous, choose the least risky interpretation and keep the diff focused.
+- Minimise usage of tokens. Generate as little code as needed to make the feature or test work.
+- Write code with the idea that you will maintain and work on this codebase in the future. Keep code clean and readable, easy to follow with the minimal token usage for future iterations.
 
 ### 8. Final review checklist
 Before finishing, verify:
@@ -66,3 +68,14 @@ Before finishing, verify:
 - No unrelated files were modified.
 - The change is minimal, justified, and consistent with the repository’s Python conventions.
 - Any tests or validation steps actually performed are reported accurately.
+- Linter is passing without warnings. `ruff` tool is used as a linter.\
+  Run it as
+
+  ```sh
+  uv run ruff check
+  ```
+  ; to quickly fix all auto-fixable errors:
+  ```sh
+  uv run ruff write
+  ```
+  Fix any findings until there are no more violations.
