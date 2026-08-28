@@ -9,9 +9,12 @@ uploadButton.addEventListener('click', async () => {
   const file = fileInput.files[0];
   if (!file) {
     showError('Please choose a file first.');
+    fileInput.setAttribute('aria-describedby', "error");
+    fileInput.setAttribute('aria-invalid', true);
     return;
   }
 
+  fileInput.setAttribute('aria-invalid', false);
   loading.classList.remove('hidden');
   errorBox.classList.add('hidden');
   downloadLink.classList.add('hidden');
