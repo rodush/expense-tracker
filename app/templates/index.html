@@ -1,11 +1,12 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
 
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Expense Categorizer</title>
+  <title>Expenses Categorizer</title>
   <link rel="stylesheet" href="/static/pico/css/pico.green.min.css">
+  <link rel="icon" href="/static/images/favicon.ico" />
   <style type="text/css">
     .hidden {
       display: none;
@@ -14,9 +15,24 @@
 </head>
 
 <body>
+  <header class="container">
+    <nav>
+      <ul>
+        <li><img src="/static/images/expense-tracker-logo.png" width="100rem" preload="true" /></li>
+        <li>
+          <h1 style="display: inline-block;" class="inline">Expenses Categorizer - MVP</h1>
+        </li>
+      </ul>
+      <ul>
+        <li><a href="/about.html">About</a></li>
+        <li><a href="/">Home</a></li>
+      </ul>
+    </nav>
+
+
+  </header>
   <main class="container">
     <div class="panel">
-      <h1>Expense Categorizer MVP</h1>
       <p>Upload a CSV, XLS, or XLSX expense file to categorize descriptions with Gemini.</p>
       <input id="fileInput" type="file" accept=".csv,.xls,.xlsx" aria-errormessage="error" />
       <button id="uploadButton">Upload & Categorize</button>
@@ -24,7 +40,7 @@
       <div id="error" class="error hidden"></div>
     </div>
 
-    <div class="panel">
+    <article>
       <h2>Preview</h2>
       <table id="resultsTable">
         <thead>
@@ -39,8 +55,9 @@
         <tbody></tbody>
       </table>
       <a id="downloadLink" class="hidden">Download categorized file</a>
-    </div>
+    </article>
   </main>
+  <footer class="container"><em>Experimenting with Python and FastAPI &dash; &copy; 2026</em></footer>
   <script src="/static/app.js"></script>
 </body>
 
