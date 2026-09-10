@@ -16,25 +16,26 @@ tools:
   github:
     toolsets: [default]
 safe-outputs:
-  close-pull-request:
   add-comment:
     max: 1
-  create-pull-request-review-comment:
-    max: 10
-  submit-pull-request-review:
-    allowed-events: [COMMENT]
-  reply-to-pull-request-review-comment:
-  resolve-pull-request-review-thread:
   add-labels:
-  remove-labels:
   add-reviewer:
   assign-to-agent:
   assign-to-user:
+  close-pull-request:
+  create-pull-request-review-comment:
+    max: 10
+  hide-comment:
+  link-sub-issue:
+  submit-pull-request-review:
+    allowed-events: [COMMENT]
+  remove-labels:
+  reply-to-pull-request-review-comment:
+  report-failure-as-issue: false
+  resolve-pull-request-review-thread:
   unassign-from-user:
   update-issue:
   update-pull-request:
-  link-sub-issue:
-  hide-comment:
 ---
 
 # pr-review
