@@ -7,7 +7,7 @@ permissions:
       issues: read
       pull-requests: read
 engine: copilot
-model: gpt-4o
+model: o3-mini
 network:
   allowed:
     - defaults
