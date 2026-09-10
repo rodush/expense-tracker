@@ -7,6 +7,7 @@ permissions:
       issues: read
       pull-requests: read
 engine: copilot
+model: gpt-4.1
 network:
   allowed:
     - defaults
@@ -15,38 +16,44 @@ tools:
   github:
     toolsets: [default]
 safe-outputs:
-  close-pull-request:
   add-comment:
-  create-pull-request-review-comment:
-  submit-pull-request-review:
-  reply-to-pull-request-review-comment:
-  resolve-pull-request-review-thread:
+    max: 1
   add-labels:
-  remove-labels:
   add-reviewer:
   assign-to-agent:
   assign-to-user:
+  close-pull-request:
+  create-pull-request-review-comment:
+    max: 10
+  hide-comment:
+  link-sub-issue:
+  submit-pull-request-review:
+    allowed-events: [COMMENT]
+  remove-labels:
+  reply-to-pull-request-review-comment:
+  report-failure-as-issue: false
+  resolve-pull-request-review-thread:
   unassign-from-user:
   update-issue:
   update-pull-request:
-  link-sub-issue:
-  hide-comment:
 ---
 
 # pr-review
 
-Once pull request is opened, review the changes against provided description, leave inline comments as necessary, approve or ask for changes otherwise. Once pull request is updated, repeat the same - review the changes, leave comments as necessary and finalise the review by approving it if no more further concerns.
+Once pull request is opened, review the changes against provided description, leave inline comments as necessary.\
+Once pull request is updated, repeat the same - review the changes, leave comments as necessary
+Finalise review by leaving a summary comment with all the findings and recommendations, or just leave - LGTM if no major concerns.
 
 During review it's important to check readability of the code:
 - clear variable and method names
 - logical and easy to follow structure of the files
 
-It's imiportant to make sure logs are added to the critical decision points
-and the right loggin level (INFO, WARN, ERROR) is used, depending on the severity and type of the logged message.
+It's important to make sure logs are added to the critical decision points,
+and the right logging level (INFO, WARN, ERROR) is used, depending on the severity and type of the logged message.
 
-Ensure that there is decent error handling is in place, code should be robust and resilient.
+Ensure that there is decent error handling in place - code should be robust and resilient.
 
-Ensure there are no security concerns - user input is validated and properly escaped, and not used in the unsanitsied SQL expressions.
+Ensure there are no security concerns - user input is validated, properly escaped, and not used in the raw SQL expressions.
 
 <!--
 ## TODO: Customize this workflow
