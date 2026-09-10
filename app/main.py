@@ -66,7 +66,7 @@ def _load_spreadsheet(raw_content: bytes, file_extension: str) -> pd.DataFrame:
         return pd.read_csv(BytesIO(raw_content))
 
     excel_file = pd.ExcelFile(BytesIO(raw_content))
-    return excel_file.parse(sheet_name=0)
+    return excel_file.parse(sheet_name=0)  # ty: ignore[invalid-return-type]
 
 
 @app.get("/health")
@@ -111,7 +111,8 @@ async def upload_expense_file(
         )
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {file_extension or 'unknown'}. Use CSV, XLS, or XLSX.",
+            detail=f"Unsupported file type: {file_extension or 'unknown'}."
+            "Use CSV, XLS, or XLSX.",
         )
 
     raw_content = await file.read()
