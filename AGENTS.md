@@ -68,14 +68,36 @@ Before finishing, verify:
 - No unrelated files were modified.
 - The change is minimal, justified, and consistent with the repository’s Python conventions.
 - Any tests or validation steps actually performed are reported accurately.
-- Linter is passing without warnings. `ruff` tool is used as a linter.\
-  Run it as
+- Code quality tools are used (see [Development tools](#development-tools) section) and no errors found.
 
-  ```sh
-  uv run ruff check
-  ```
-  ; to quickly fix all auto-fixable errors:
-  ```sh
-  uv run ruff write
-  ```
-  Fix any findings until there are no more violations.
+## Development tools
+
+Below are listed tools and showed their usage to enforce code style consistency, accurate type checks, etc.
+
+### Coding style
+
+We use [ruff](https://docs.astral.sh/ruff/) to ensure coding style consistency.
+
+Run it as:
+
+```sh
+uv run ruff check
+```
+
+If any violations or errors found, try to autofix them with:
+
+```sh
+uv run ruff format
+```
+
+Afterwards, re-run check again. Make sure there are no coding style errors before committing and pushing the changes to remote.
+
+### Type Checking
+
+We use [ty](https://docs.astral.sh/ty/) to run static type analysis. Use it as:
+
+```sh
+uv run ty check
+```
+
+Attempt to fix types accurately. Silencing the error should really be the last resort!

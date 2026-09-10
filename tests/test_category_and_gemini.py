@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import cast
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -43,12 +46,14 @@ def test_category_settings_are_loaded_from_config() -> None:
     assert "Other" in settings.allowed_categories
 
 
-def test_categorize_dataframe_batches_records_and_maps_indices(monkeypatch) -> None:
+def test_categorize_dataframe_batches_records_and_maps_indices(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captured_batch_sizes: list[int] = []
 
     def fake_call_gemini_batch(batch: list[dict[str, object]]) -> dict[int, str]:
         captured_batch_sizes.append(len(batch))
-        return {int(item["record_index"]): "Other" for item in batch}
+        return {cast(int, (item["record_index"])): "Other" for item in batch}
 
     monkeypatch.setattr(gemini_service, "_call_gemini_batch", fake_call_gemini_batch)
 
@@ -66,8 +71,10 @@ def test_normalize_category_rejects_unknown_values_and_falls_back_to_other() -> 
     assert normalize_category("Mystery Category") == "Other"
 
 
-def test_categorize_dataframe_falls_back_when_gemini_is_unavailable(monkeypatch) -> None:
-    monkeypatch.setattr(gemini_service, "_call_gemini_batch", lambda batch: None)
+def test_categorize_dataframe_falls_back_when_gemini_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # monkeypatch.setattr(gemini_service, "_call_gemini_batch")
 
     rows = [{"description": "Coffee at the cafe"}]
     categorized_rows = gemini_service.categorize_dataframe(rows)
@@ -75,7 +82,9 @@ def test_categorize_dataframe_falls_back_when_gemini_is_unavailable(monkeypatch)
     assert categorized_rows[0]["category"] == "Other"
 
 
-def test_categorize_dataframe_falls_back_when_gemini_call_raises(monkeypatch) -> None:
+def test_categorize_dataframe_falls_back_when_gemini_call_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def explode(batch: list[dict[str, object]]) -> dict[int, str]:
         raise RuntimeError("transient gemini failure")
 
@@ -91,7 +100,7 @@ def test_ui_route_serves_the_browser_page() -> None:
     response = client.get("/ui")
 
     assert response.status_code == 200
-    assert "Expense Categorizer MVP" in response.text
+    assert "Expenses Categorizer - MVP" in response.text
     assert "Upload & Categorize" in response.text
 
 

@@ -18,7 +18,9 @@ from app.services.gemini_service import (
     determine_who_from_description,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
+)
 logger = logging.getLogger("expense_tracker")
 
 app = FastAPI(title="Expense Categorizer", version="0.1.0")
@@ -45,7 +47,7 @@ def _load_spreadsheet(raw_content: bytes, file_extension: str) -> pd.DataFrame:
         return pd.read_csv(BytesIO(raw_content))
 
     excel_file = pd.ExcelFile(BytesIO(raw_content))
-    return excel_file.parse(sheet_name=0)
+    return excel_file.parse(sheet_name=0)  # ty: ignore[invalid-return-type]
 
 
 @app.get("/health")
@@ -84,10 +86,14 @@ async def upload_expense_file(
 
     file_extension = Path(file.filename).suffix.lower()
     if file_extension not in ALLOWED_EXTENSIONS:
-        logger.warning("Rejected unsupported upload", extra={"file_name": file.filename, "extension": file_extension})
+        logger.warning(
+            "Rejected unsupported upload",
+            extra={"file_name": file.filename, "extension": file_extension},
+        )
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {file_extension or 'unknown'}. Use CSV, XLS, or XLSX.",
+            detail=f"Unsupported file type: {file_extension or 'unknown'}."
+            "Use CSV, XLS, or XLSX.",
         )
 
     raw_content = await file.read()
@@ -100,7 +106,9 @@ async def upload_expense_file(
     try:
         dataframe = _load_spreadsheet(raw_content, file_extension)
     except Exception as exc:
-        logger.exception("Failed to parse uploaded spreadsheet", extra={"file_name": file.filename})
+        logger.exception(
+            "Failed to parse uploaded spreadsheet", extra={"file_name": file.filename}
+        )
         raise HTTPException(
             status_code=400, detail=f"Unable to parse file content: {exc}"
         ) from exc
@@ -109,7 +117,10 @@ async def upload_expense_file(
 
     missing_columns = sorted(REQUIRED_COLUMNS.difference(dataframe.columns))
     if missing_columns:
-        logger.warning("Upload missing required columns", extra={"file_name": file.filename, "missing_columns": missing_columns})
+        logger.warning(
+            "Upload missing required columns",
+            extra={"file_name": file.filename, "missing_columns": missing_columns},
+        )
         raise HTTPException(
             status_code=400,
             detail=f"Missing required columns: {', '.join(missing_columns)}",
@@ -135,7 +146,14 @@ async def upload_expense_file(
 
     download_id = str(uuid.uuid4())
     DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    logger.info("Upload processed successfully", extra={"file_name": file.filename, "rows": len(dataframe), "download_id": download_id})
+    logger.info(
+        "Upload processed successfully",
+        extra={
+            "file_name": file.filename,
+            "rows": len(dataframe),
+            "download_id": download_id,
+        },
+    )
     output_path = DOWNLOADS_DIR / f"categorized_{download_id}.csv"
     dataframe.to_csv(output_path, index=False)
 
