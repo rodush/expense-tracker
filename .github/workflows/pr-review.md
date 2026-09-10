@@ -7,7 +7,7 @@ permissions:
       issues: read
       pull-requests: read
 engine: copilot
-model: gemini-3.5-flash
+model: gpt-4o
 network:
   allowed:
     - defaults
