@@ -195,7 +195,7 @@ def _classify_batch(
 
     try:
         categorized_by_index = _call_gemini_batch(batch_payload)
-    except (RuntimeError, ValueError, TypeError, AttributeError):
+    except RuntimeError, ValueError, TypeError, AttributeError:
         categorized_by_index = None
 
     if categorized_by_index:
