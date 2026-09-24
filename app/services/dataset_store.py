@@ -19,7 +19,7 @@ def parse_amount(value: Any) -> Decimal:
 
     try:
         amount = Decimal(str(value).strip())
-    except (InvalidOperation, ValueError):
+    except InvalidOperation, ValueError:
         raise ValueError("amount must be numeric") from None
 
     if not amount.is_finite():
