@@ -1,7 +1,7 @@
 ---
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, closed]
 permissions:
       contents: read
       issues: read
@@ -41,8 +41,27 @@ safe-outputs:
 
 # pr-review
 
-Once pull request is opened, review the changes against provided description, leave inline comments as necessary.\
-Once pull request is updated, repeat the same - review the changes, leave comments as necessary
+For an opened or updated pull request, review the changes against the provided
+description and leave inline comments as necessary. Once the pull request is
+updated, repeat the review.
+
+When a pull request is closed, act only if it was merged. Identify every GitHub
+issue explicitly addressed by the merged pull request (including `Closes`,
+`Fixes`, and equivalent references, plus the issue body and changed files).
+Compare each issue's acceptance criteria with the implementation on the merged
+default branch. Close an issue with a concise comment linking the merged pull
+request only when the implementation is complete and the pull request is
+actually merged. Do not close issues for documentation-only planning,
+references, open or closed-unmerged pull requests, or partial implementations.
+If an issue is only partially addressed, leave it open and explain the
+remaining work in a comment.
+
+When planning or implementing work for multiple issues, keep each issue in a
+separate pull request whenever the changes can be reasonably separated. A pull
+request may combine issues only when they share one cohesive implementation;
+list every included issue and its acceptance-criteria evidence in the
+description. Never close an issue merely because a pull request mentions it.
+
 Finalise review by leaving a summary comment with all the findings and recommendations, or just leave - LGTM if no major concerns.
 
 During review it's important to check readability of the code:
