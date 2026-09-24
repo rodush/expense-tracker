@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import sys
+import threading
 from pathlib import Path
 from typing import Any, cast
 
@@ -62,6 +64,27 @@ def test_categorize_dataframe_batches_records_and_maps_indices(
 
     assert len(categorized_rows) == 52
     assert captured_batch_sizes == [50, 2]
+    assert categorized_rows[0]["category"] == "Other"
+    assert categorized_rows[51]["category"] == "Other"
+
+
+def test_categorize_dataframe_async_sends_batches_concurrently(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    batch_barrier = threading.Barrier(2)
+
+    def fake_classify_batch(
+        batch: list[dict[str, object]], start_index: int
+    ) -> dict[int, str]:
+        batch_barrier.wait(timeout=1)
+        return {start_index + offset: "Other" for offset in range(len(batch))}
+
+    monkeypatch.setattr(gemini_service, "_classify_batch", fake_classify_batch)
+
+    rows = [{"description": f"Expense {index}"} for index in range(52)]
+    categorized_rows = asyncio.run(gemini_service.categorize_dataframe_async(rows))
+
+    assert len(categorized_rows) == 52
     assert categorized_rows[0]["category"] == "Other"
     assert categorized_rows[51]["category"] == "Other"
 
