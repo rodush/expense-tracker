@@ -47,13 +47,27 @@ This repository is a Python-based project. Treat all changes as production-adjac
 - Run the relevant tests for any Python change when feasible.
 - When fixing an issue make sure the broken test is created first, and make sure it passes after the fix is implemented.
 - Do not claim tests pass unless they were actually run.
-- Run tests from the local directory where `pytest` is installed in the `.venv` with `uv`:
+- Run Python tests from the local directory where `pytest` is installed in the `.venv` with `uv`:
 
 Run command while in the workspace directory (expense-tracker):
 
 ```sh
 uv run pytest
 ```
+
+- Do not run `uv` commands for JavaScript, HTML, or CSS-only changes. Python
+  validation is not a substitute for frontend validation.
+- For JavaScript, HTML, or CSS changes, use the frontend test command:
+
+```sh
+npm run test
+```
+
+- Frontend tests are not currently configured. Until they are added, it is
+  acceptable to skip `npm run test` for frontend-only changes and report that
+  no frontend test suite is available.
+- When a change spans Python and frontend code, run each applicable validation
+  command separately.
 
 ### 7. Change discipline
 - Do not make unrelated cleanup changes.
@@ -70,9 +84,10 @@ Before finishing, verify:
 - Any tests or validation steps actually performed are reported accurately.
 - Code quality tools are used (see [Development tools](#development-tools) section) and no errors found.
 
-## Development tools
+## Python development tools
 
-Below are listed tools and showed their usage to enforce code style consistency, accurate type checks, etc.
+The following tools apply only to Python code and enforce code style and type
+checking. Do not use them as validation for frontend-only changes.
 
 ### Coding style
 

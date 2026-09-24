@@ -11,6 +11,30 @@
     .hidden {
       display: none;
     }
+
+    .dashboard-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    }
+
+    .chart {
+      min-height: 16rem;
+    }
+
+    .chart svg {
+      height: 16rem;
+      width: 100%;
+    }
+
+    .chart text {
+      fill: currentColor;
+      font-size: 0.75rem;
+    }
+
+    .chart rect {
+      fill: var(--pico-primary);
+    }
   </style>
 </head>
 
@@ -54,8 +78,60 @@
         </thead>
         <tbody></tbody>
       </table>
-      <a id="downloadLink" class="hidden">Download categorized file</a>
+      <p>
+        <a id="downloadLink" class="hidden">Download full categorized CSV</a>
+        <a id="filteredDownloadLink" class="hidden">Download current filtered CSV</a>
+      </p>
     </article>
+
+    <section id="dashboard" class="hidden" aria-labelledby="dashboardHeading">
+      <h2 id="dashboardHeading">Spending dashboard</h2>
+      <form id="filterForm">
+        <div class="grid">
+          <label for="categoryFilter">Categories
+            <select id="categoryFilter" multiple size="5" disabled
+              aria-describedby="filterHelp"></select>
+          </label>
+          <label for="whoFilter">Who
+            <select id="whoFilter" multiple size="5" disabled
+              aria-describedby="filterHelp"></select>
+          </label>
+        </div>
+        <small id="filterHelp">Use Ctrl or Command while selecting multiple values.</small>
+        <button id="clearFilters" type="button" class="secondary" disabled>Clear filters</button>
+        <p id="activeFilters" aria-live="polite">No filters active.</p>
+      </form>
+
+      <div id="dashboardLoading" class="hidden" role="status">Loading summary...</div>
+      <div id="dashboardError" class="error hidden" role="alert"></div>
+      <div id="dashboardEmpty" class="hidden" role="status">
+        No expenses match the selected filters.
+      </div>
+      <div id="dashboardContent">
+        <div class="dashboard-grid">
+          <article><strong>Total</strong><p id="totalAmount">—</p></article>
+          <article><strong>Expenses</strong><p id="expenseCount">—</p></article>
+        </div>
+        <article>
+          <header><strong>Spending by category</strong></header>
+          <div id="categoryChart" class="chart" role="img"
+            aria-label="Bar chart showing spending by category"></div>
+          <table id="categoryTable">
+            <caption>Category totals</caption>
+            <thead><tr><th>Category</th><th>Amount</th><th>Count</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </article>
+        <article>
+          <header><strong>Spending by person</strong></header>
+          <table id="whoTable">
+            <caption>Person totals</caption>
+            <thead><tr><th>Person</th><th>Amount</th><th>Count</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </article>
+      </div>
+    </section>
   </main>
   <footer class="container"><em>Experimenting with Python and FastAPI &dash; &copy; 2026</em></footer>
   <script src="/static/app.js"></script>

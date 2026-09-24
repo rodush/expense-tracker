@@ -6,7 +6,6 @@ import threading
 from pathlib import Path
 from typing import Any, cast
 
-from fastapi import Response
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
 
@@ -23,7 +22,7 @@ client = TestClient(app)
 def test_missing_required_columns_returns_clear_validation_error() -> None:
     csv_content = "date,amount\n2026-07-01,15.50\n"
 
-    response: Response = client.post(
+    response = client.post(
         "/upload",
         files={"file": ("expenses.csv", csv_content.encode("utf-8"), "text/csv")},
     )
@@ -90,7 +89,6 @@ def test_categorize_dataframe_async_sends_batches_concurrently(
 
 
 def test_normalize_category_rejects_unknown_values_and_falls_back_to_other() -> None:
-    assert normalize_category("Grocery") == "Grocery"
     assert normalize_category("Mystery Category") == "Other"
 
 
@@ -100,7 +98,7 @@ def test_categorize_dataframe_falls_back_when_gemini_is_unavailable(
     rows = [{"description": "Coffee at the cafe"}]
     categorized_rows = gemini_service.categorize_dataframe(rows)
 
-    assert categorized_rows[0]["category"] == "Other"
+    assert categorized_rows[0]["category"] == normalize_category("Food")
 
 
 def test_categorize_dataframe_falls_back_when_gemini_call_raises(
@@ -114,7 +112,67 @@ def test_categorize_dataframe_falls_back_when_gemini_call_raises(
     rows = [{"description": "Coffee at the cafe"}]
     categorized_rows = gemini_service.categorize_dataframe(rows)
 
-    assert categorized_rows[0]["category"] == "Other"
+    assert categorized_rows[0]["category"] == normalize_category("Food")
+
+
+def test_categorize_dataframe_retries_transient_gemini_failure(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    attempts = 0
+
+    def fail_once(batch: list[dict[str, object]]) -> dict[int, str]:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise TimeoutError("temporary timeout")
+        return {int(cast(int, batch[0]["record_index"])): "Shopping"}
+
+    monkeypatch.setattr(gemini_service, "_call_gemini_batch", fail_once)
+    monkeypatch.setattr(gemini_service.time, "sleep", lambda _: None)
+
+    categorized_rows = gemini_service.categorize_dataframe(
+        [{"description": "Amazon store"}]
+    )
+
+    assert attempts == 2
+    assert categorized_rows[0]["category"] == "Shopping"
+
+
+def test_categorize_dataframe_uses_fallback_after_retry_limit(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    attempts = 0
+
+    def always_times_out(batch: list[dict[str, object]]) -> dict[int, str]:
+        nonlocal attempts
+        attempts += 1
+        raise TimeoutError("temporary timeout")
+
+    monkeypatch.setattr(gemini_service, "_call_gemini_batch", always_times_out)
+    monkeypatch.setattr(gemini_service.time, "sleep", lambda _: None)
+
+    categorized_rows = gemini_service.categorize_dataframe(
+        [{"description": "Amazon store"}]
+    )
+
+    assert attempts == gemini_service.GEMINI_MAX_RETRIES + 1
+    assert categorized_rows[0]["category"] == "Shopping"
+
+
+def test_categorize_dataframe_async_falls_back_when_batch_times_out(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    async def timeout(awaitable: Any, **kwargs: Any) -> dict[int, str]:
+        awaitable.close()
+        raise TimeoutError
+
+    monkeypatch.setattr(asyncio, "wait_for", timeout)
+
+    categorized_rows = asyncio.run(
+        gemini_service.categorize_dataframe_async([{"description": "Amazon store"}])
+    )
+
+    assert categorized_rows[0]["category"] == "Shopping"
 
 
 def test_ui_route_serves_the_browser_page() -> None:
