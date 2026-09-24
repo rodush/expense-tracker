@@ -1,6 +1,9 @@
+import logging
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 router = APIRouter()
+logger = logging.getLogger("expense_tracker.websocket")
 
 active_connections: list[WebSocket] = []
 
@@ -15,4 +18,4 @@ async def websocket_handler(ws: WebSocket):
             for conn in active_connections:
                 await conn.send_text(data)
     except WebSocketDisconnect:
-        print("Client disconnected normally")
+        logger.info("websocket.disconnected", extra={"operation": "websocket"})

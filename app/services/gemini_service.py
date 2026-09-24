@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
+import time
 from collections.abc import Iterable, Mapping
 from typing import Any, cast
 
@@ -20,8 +22,12 @@ except ImportError:
 
 from app.config import settings
 
+logger = logging.getLogger("expense_tracker.categorization")
 GEMINI_MODEL = "gemini-2.5-flash"
 BATCH_SIZE = 50
+GEMINI_TIMEOUT_SECONDS = 15
+GEMINI_MAX_RETRIES = 2
+GEMINI_RETRY_DELAY_SECONDS = 0.1
 
 
 def normalize_category(raw_category: str) -> str:
@@ -147,6 +153,7 @@ def _call_gemini_batch(batch: list[dict[str, Any]]) -> dict[int, str] | None:
     response = model.generate_content(
         prompt_payload,
         generation_config=generation_config,
+        request_options={"timeout": GEMINI_TIMEOUT_SECONDS},
     )
 
     cleaned_text = str(getattr(response, "text", "") or "").strip()
@@ -154,17 +161,16 @@ def _call_gemini_batch(batch: list[dict[str, Any]]) -> dict[int, str] | None:
         return None
 
     try:
-        parsed_payload: list[dict[str, Any]] = json.loads(cleaned_text)
+        parsed_payload = json.loads(cleaned_text)
     except json.JSONDecodeError:
         return None
-
-    # if not isinstance(parsed_payload, list):
-    #     return None
+    if not isinstance(parsed_payload, list):
+        return None
 
     category_by_index: dict[int, str] = {}
     for item in parsed_payload:
-        # if not isinstance(item, dict):
-        #     continue
+        if not isinstance(item, dict):
+            continue
         record_index = item.get("record_index")
         category = item.get("category")
         if isinstance(record_index, int) and isinstance(category, str):
@@ -194,14 +200,29 @@ def _classify_batch(
     if not batch_payload:
         return {}
 
-    try:
-        categorized_by_index = _call_gemini_batch(batch_payload)
-    except RuntimeError, ValueError, TypeError, AttributeError:
-        categorized_by_index = None
+    categorized_by_index = None
+    for attempt in range(GEMINI_MAX_RETRIES + 1):
+        try:
+            categorized_by_index = _call_gemini_batch(batch_payload)
+            break
+        except ConnectionError, OSError, TimeoutError, RuntimeError:
+            if attempt == GEMINI_MAX_RETRIES:
+                break
+            time.sleep(GEMINI_RETRY_DELAY_SECONDS * (2**attempt))
+        except AttributeError, TypeError, ValueError:
+            break
 
     if categorized_by_index:
+        logger.info(
+            "categorization.completed",
+            extra={"operation": "gemini_batch", "record_count": len(batch_payload)},
+        )
         return categorized_by_index
 
+    logger.warning(
+        "categorization.fallback_used",
+        extra={"operation": "heuristic_batch", "record_count": len(batch_payload)},
+    )
     return fallback_map
 
 
@@ -236,6 +257,17 @@ def _merge_categorized_batches(
     return categorized_rows
 
 
+def _fallback_batch(
+    records: list[Mapping[str, Any]], start_index: int
+) -> dict[int, str]:
+    return {
+        start_index + offset: normalize_category(
+            _heuristic_category(str(record.get("description", "") or "").strip())
+        )
+        for offset, record in enumerate(records)
+    }
+
+
 async def categorize_dataframe_async(
     rows: Iterable[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -244,11 +276,20 @@ async def categorize_dataframe_async(
         (records[start_index : start_index + BATCH_SIZE], start_index)
         for start_index in range(0, len(records), BATCH_SIZE)
     ]
+
+    async def classify_with_timeout(
+        chunk: list[Mapping[str, Any]], start_index: int
+    ) -> dict[int, str]:
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(_classify_batch, chunk, start_index),
+                timeout=GEMINI_TIMEOUT_SECONDS * (GEMINI_MAX_RETRIES + 1),
+            )
+        except TimeoutError:
+            return _fallback_batch(chunk, start_index)
+
     batch_results = await asyncio.gather(
-        *(
-            asyncio.to_thread(_classify_batch, chunk, start_index)
-            for chunk, start_index in batches
-        )
+        *(classify_with_timeout(chunk, start_index) for chunk, start_index in batches)
     )
     return _merge_categorized_batches(records, list(batch_results))
 

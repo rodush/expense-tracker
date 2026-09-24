@@ -19,3 +19,19 @@ The dashboard will render uploaded values and exported data in several places. T
 - The table and chart output remain consistent with the selected filters
 - The dashboard avoids unsafe string interpolation in DOM rendering paths
 - The chosen export semantics are documented in the app workflow
+
+## Decisions
+
+- Preview cells are created with `textContent` and appended as DOM nodes. Uploaded
+  values are displayed as text even when they contain HTML or script-like content;
+  no uploaded value is interpolated into `innerHTML`.
+- The existing `/download/{download_id}` endpoint remains the full categorized
+  upload export and continues to serve the original CSV artifact.
+- Filtered exports are explicit and separate: `GET
+  /datasets/{dataset_id}/export` accepts repeated `category` and `who` query
+  parameters using the same AND semantics and validation as summary requests.
+  Without filters it exports the complete normalized dataset; with filters it
+  exports only matching normalized rows.
+- The UI exposes both links. The full link preserves the uploaded CSV exactly,
+  while the filtered link follows the current dashboard selections and uses the
+  normalized dataset shared by summary aggregation.
