@@ -21,6 +21,7 @@ dependencies = [
 dev = [
     "httpx2>=2.13.0",
     "ruff>=0.16.1",
+    "ty>=0.0.80",
 ]
 
 [tool.fastapi]
