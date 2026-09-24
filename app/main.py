@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.services.gemini_service import (
-    categorize_dataframe,
+    categorize_dataframe_async,
     determine_who_from_description,
 )
 
@@ -160,7 +160,7 @@ async def upload_expense_file(
         {str(key): value for key, value in row.items()}
         for row in dataframe.to_dict(orient="records")
     ]
-    categorized_rows = categorize_dataframe(normalized_rows)
+    categorized_rows = await categorize_dataframe_async(normalized_rows)
     dataframe = dataframe.assign(category=[row["category"] for row in categorized_rows])
 
     download_id = str(uuid.uuid4())

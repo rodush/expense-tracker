@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from collections.abc import Iterable, Mapping
@@ -211,16 +212,18 @@ def classify_description(description: str) -> str:
     return normalize_category(_heuristic_category(description))
 
 
-def categorize_dataframe(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    records = list(rows)
+def _merge_categorized_batches(
+    records: list[Mapping[str, Any]],
+    batch_results: list[dict[int, str]],
+) -> list[dict[str, Any]]:
     categorized_rows: list[dict[str, Any]] = []
 
-    for start_index in range(0, len(records), BATCH_SIZE):
-        chunk = records[start_index : start_index + BATCH_SIZE]
-        category_by_index = _classify_batch(chunk, start_index)
+    for start_index, chunk_start in enumerate(range(0, len(records), BATCH_SIZE)):
+        chunk = records[chunk_start : chunk_start + BATCH_SIZE]
+        category_by_index = batch_results[start_index]
 
         for offset, row in enumerate(chunk):
-            record_index = start_index + offset
+            record_index = chunk_start + offset
             normalized_row = dict(row)
             normalized_row["category"] = category_by_index.get(
                 record_index,
@@ -231,3 +234,24 @@ def categorize_dataframe(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, An
             categorized_rows.append(normalized_row)
 
     return categorized_rows
+
+
+async def categorize_dataframe_async(
+    rows: Iterable[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    records = list(rows)
+    batches = [
+        (records[start_index : start_index + BATCH_SIZE], start_index)
+        for start_index in range(0, len(records), BATCH_SIZE)
+    ]
+    batch_results = await asyncio.gather(
+        *(
+            asyncio.to_thread(_classify_batch, chunk, start_index)
+            for chunk, start_index in batches
+        )
+    )
+    return _merge_categorized_batches(records, list(batch_results))
+
+
+def categorize_dataframe(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    return asyncio.run(categorize_dataframe_async(rows))
