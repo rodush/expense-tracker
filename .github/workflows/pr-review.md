@@ -12,6 +12,7 @@ network:
   allowed:
     - defaults
     - python
+    - "github.com"
 tools:
   github:
     toolsets: [default]
