@@ -8,6 +8,8 @@ import time
 from collections.abc import Iterable, Mapping
 from typing import Any, cast
 
+from google.api_core.exceptions import GoogleAPICallError
+
 try:
     import google.generativeai as genai  # type: ignore[reportMissingImports]
 except ImportError:
@@ -205,7 +207,13 @@ def _classify_batch(
         try:
             categorized_by_index = _call_gemini_batch(batch_payload)
             break
-        except ConnectionError, OSError, TimeoutError, RuntimeError:
+        except (
+            ConnectionError,
+            GoogleAPICallError,
+            OSError,
+            TimeoutError,
+            RuntimeError,
+        ):
             if attempt == GEMINI_MAX_RETRIES:
                 break
             time.sleep(GEMINI_RETRY_DELAY_SECONDS * (2**attempt))

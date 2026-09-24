@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from fastapi.testclient import TestClient
+from google.api_core.exceptions import DeadlineExceeded
 from pytest import MonkeyPatch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -149,6 +150,27 @@ def test_categorize_dataframe_uses_fallback_after_retry_limit(
         raise TimeoutError("temporary timeout")
 
     monkeypatch.setattr(gemini_service, "_call_gemini_batch", always_times_out)
+    monkeypatch.setattr(gemini_service.time, "sleep", lambda _: None)
+
+    categorized_rows = gemini_service.categorize_dataframe(
+        [{"description": "Amazon store"}]
+    )
+
+    assert attempts == gemini_service.GEMINI_MAX_RETRIES + 1
+    assert categorized_rows[0]["category"] == "Shopping"
+
+
+def test_categorize_dataframe_falls_back_when_gemini_deadline_expires(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    attempts = 0
+
+    def deadline_exceeded(batch: list[dict[str, object]]) -> dict[int, str]:
+        nonlocal attempts
+        attempts += 1
+        raise DeadlineExceeded("Gemini request timed out")
+
+    monkeypatch.setattr(gemini_service, "_call_gemini_batch", deadline_exceeded)
     monkeypatch.setattr(gemini_service.time, "sleep", lambda _: None)
 
     categorized_rows = gemini_service.categorize_dataframe(
