@@ -74,6 +74,18 @@ section together.
   must be introduced as a separate, explicit action or endpoint rather than
   silently changing the meaning of the existing download link.
 
+## Contribution
+
+### Prerequisites
+
+In order to contribute to the project, you need to have the following ecosystem:
+- Python v3.14+ (soon will be 3.15)
+- uv (Install as per your OS way)
+- git (Install as per your OS way)
+- github cli tool [gh](https://cli.github.com/)
+- [trufflehog](https://github.com/trufflesecurity/trufflehog)
+- [Github Agentic Workflows](https://github.com/github/gh-aw) extension
+
 ## Run locally
 
 ```bash
