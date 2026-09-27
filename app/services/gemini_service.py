@@ -6,21 +6,12 @@ import logging
 import os
 import time
 from collections.abc import Iterable, Mapping
-from typing import Any, cast
+from typing import Any
 
-from google.api_core.exceptions import GoogleAPICallError
-
-try:
-    import google.generativeai as genai  # type: ignore[reportMissingImports]
-except ImportError:
-    genai = None
-
-try:
-    from google.generativeai import (
-        types as genai_types,  # type: ignore[reportMissingImports]
-    )
-except ImportError:
-    genai_types = None
+import httpx
+from google import genai
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 
 from app.config import settings
 
@@ -131,32 +122,32 @@ def _batch_system_instruction() -> str:
 
 
 def _call_gemini_batch(batch: list[dict[str, Any]]) -> dict[int, str] | None:
-    if genai is None or genai_types is None:
-        return None
-
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         return None
 
-    gemini_module = cast(Any, genai)
-    gemini_module.configure(api_key=api_key)
-    model = gemini_module.GenerativeModel(
-        model_name=GEMINI_MODEL,
-        system_instruction=_batch_system_instruction(),
+    client = genai.Client(
+        api_key=api_key,
+        http_options=genai_types.HttpOptions(
+            timeout=GEMINI_TIMEOUT_SECONDS * 1000,
+        ),
     )
-
-    generation_config = genai_types.GenerationConfig(
+    generation_config = genai_types.GenerateContentConfig(
         temperature=0.0,
         response_mime_type="application/json",
         response_schema=_batch_response_schema(),
+        system_instruction=_batch_system_instruction(),
     )
 
     prompt_payload = json.dumps(batch, ensure_ascii=False)
-    response = model.generate_content(
-        prompt_payload,
-        generation_config=generation_config,
-        request_options={"timeout": GEMINI_TIMEOUT_SECONDS},
-    )
+    try:
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt_payload,
+            config=generation_config,
+        )
+    finally:
+        client.close()
 
     cleaned_text = str(getattr(response, "text", "") or "").strip()
     if not cleaned_text:
@@ -209,7 +200,8 @@ def _classify_batch(
             break
         except (
             ConnectionError,
-            GoogleAPICallError,
+            genai_errors.APIError,
+            httpx.HTTPError,
             OSError,
             TimeoutError,
             RuntimeError,

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 from fastapi.testclient import TestClient
-from google.api_core.exceptions import DeadlineExceeded
+from google.genai.errors import APIError
 from pytest import MonkeyPatch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -96,6 +98,7 @@ def test_normalize_category_rejects_unknown_values_and_falls_back_to_other() -> 
 def test_categorize_dataframe_falls_back_when_gemini_is_unavailable(
     monkeypatch: MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(gemini_service, "_call_gemini_batch", lambda batch: None)
     rows = [{"description": "Coffee at the cafe"}]
     categorized_rows = gemini_service.categorize_dataframe(rows)
 
@@ -168,7 +171,7 @@ def test_categorize_dataframe_falls_back_when_gemini_deadline_expires(
     def deadline_exceeded(batch: list[dict[str, object]]) -> dict[int, str]:
         nonlocal attempts
         attempts += 1
-        raise DeadlineExceeded("Gemini request timed out")
+        raise APIError(504, {"message": "Gemini request timed out"})
 
     monkeypatch.setattr(gemini_service, "_call_gemini_batch", deadline_exceeded)
     monkeypatch.setattr(gemini_service.time, "sleep", lambda _: None)
@@ -179,6 +182,48 @@ def test_categorize_dataframe_falls_back_when_gemini_deadline_expires(
 
     assert attempts == gemini_service.GEMINI_MAX_RETRIES + 1
     assert categorized_rows[0]["category"] == "Shopping"
+
+
+def test_call_gemini_batch_uses_google_genai_client(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    class FakeModels:
+        def generate_content(
+            self, *, model: str, contents: str, config: Any
+        ) -> SimpleNamespace:
+            captured["model"] = model
+            captured["contents"] = json.loads(contents)
+            captured["config"] = config
+            return SimpleNamespace(text='[{"record_index": 3, "category": "Shopping"}]')
+
+    class FakeClient:
+        def __init__(self, *, api_key: str, http_options: Any) -> None:
+            captured["api_key"] = api_key
+            captured["http_options"] = http_options
+            self.models = FakeModels()
+
+        def close(self) -> None:
+            captured["closed"] = True
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
+    monkeypatch.setattr(gemini_service.genai, "Client", FakeClient)
+
+    batch = [{"record_index": 3, "description": "Amazon store"}]
+    assert gemini_service._call_gemini_batch(batch) == {3: "Shopping"}
+
+    assert captured["api_key"] == "test-api-key"
+    assert captured["model"] == gemini_service.GEMINI_MODEL
+    assert captured["contents"] == batch
+    assert (
+        captured["http_options"].timeout == gemini_service.GEMINI_TIMEOUT_SECONDS * 1000
+    )
+    assert captured["closed"] is True
+    config = captured["config"]
+    assert config.temperature == 0.0
+    assert config.response_mime_type == "application/json"
+    assert config.system_instruction == gemini_service._batch_system_instruction()
 
 
 def test_categorize_dataframe_async_falls_back_when_batch_times_out(
