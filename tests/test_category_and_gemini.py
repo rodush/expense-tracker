@@ -160,7 +160,7 @@ def test_categorize_dataframe_uses_fallback_after_retry_limit(
     )
 
     assert attempts == gemini_service.GEMINI_MAX_RETRIES + 1
-    assert categorized_rows[0]["category"] == normalize_category("Shopping")
+    assert categorized_rows[0]["category"] == "Shopping"
 
 
 def test_categorize_dataframe_falls_back_when_gemini_deadline_expires(
@@ -181,7 +181,7 @@ def test_categorize_dataframe_falls_back_when_gemini_deadline_expires(
     )
 
     assert attempts == gemini_service.GEMINI_MAX_RETRIES + 1
-    assert categorized_rows[0]["category"] == normalize_category("Shopping")
+    assert categorized_rows[0]["category"] == "Shopping"
 
 
 def test_call_gemini_batch_uses_google_genai_client(
@@ -211,9 +211,7 @@ def test_call_gemini_batch_uses_google_genai_client(
     monkeypatch.setattr(gemini_service.genai, "Client", FakeClient)
 
     batch = [{"record_index": 3, "description": "Amazon store"}]
-    assert gemini_service._call_gemini_batch(batch) == {
-        3: normalize_category("Shopping")
-    }
+    assert gemini_service._call_gemini_batch(batch) == {3: "Shopping"}
 
     assert captured["api_key"] == "test-api-key"
     assert captured["model"] == gemini_service.GEMINI_MODEL
@@ -241,7 +239,7 @@ def test_categorize_dataframe_async_falls_back_when_batch_times_out(
         gemini_service.categorize_dataframe_async([{"description": "Amazon store"}])
     )
 
-    assert categorized_rows[0]["category"] == normalize_category("Shopping")
+    assert categorized_rows[0]["category"] == "Shopping"
 
 
 def test_ui_route_serves_the_browser_page() -> None:
