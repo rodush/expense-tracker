@@ -95,7 +95,7 @@ def test_upload_filters_credits_before_categorization_and_uses_absolute_debits(
     assert len(categorized_input) == 2
     assert [row["amount"] for row in categorized_input] == [15.5, 2.75]
     assert payload["row_count"] == 2
-    assert [row["amount"] for row in payload["preview"]] == [15.5, 2.75]
+    assert [row["amount"] for row in payload["preview"]] == [2.75, 15.5]
 
 
 def test_reuploading_identical_input_reuses_processed_data(

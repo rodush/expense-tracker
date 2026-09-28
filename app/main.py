@@ -322,11 +322,14 @@ async def upload_expense_file(
         },
     )
 
+    preview = dataframe.sort_values("amount", ascending=True, kind="stable").to_dict(
+        orient="records"
+    )
     return {
         "row_count": len(dataframe),
         "category_column_added": category_column_added,
         "columns": list(dataframe.columns),
-        "preview": dataframe.to_dict(orient="records"),
+        "preview": preview,
         "download_id": download_id,
         "dataset_id": dataset_id,
     }
@@ -385,7 +388,7 @@ def dataset_summary(
 
     total_amount_decimal = sum(amounts, Decimal("0.00"))
     total_amount = float(total_amount_decimal)
-    categories = aggregate("category", include_zero_values=True)
+    categories = aggregate("category")
     for item in categories:
         item["percentage"] = (
             round(item["amount"] / total_amount * 100, 2) if total_amount else 0.0

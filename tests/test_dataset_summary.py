@@ -106,8 +106,7 @@ def test_summary_returns_zero_values_for_empty_filter_result() -> None:
     payload = response.json()
     assert payload["total_amount"] == 0.0
     assert payload["expense_count"] == 0
-    assert all(item["amount"] == 0.0 for item in payload["categories"])
-    assert all(item["percentage"] == 0.0 for item in payload["categories"])
+    assert payload["categories"] == []
     assert payload["who"] == []
 
 
