@@ -16,13 +16,15 @@ const dashboardEmpty = document.getElementById('dashboardEmpty');
 const dashboardContent = document.getElementById('dashboardContent');
 const totalAmount = document.getElementById('totalAmount');
 const expenseCount = document.getElementById('expenseCount');
-const categoryChart = document.getElementById('categoryChart');
+const categoryChartCanvas = document.getElementById('categoryChart');
 const categoryTable = document.getElementById('categoryTable');
 const whoTable = document.getElementById('whoTable');
 
 let datasetId = null;
 let previewRows = [];
 let summaryRequest = null;
+let categoryChart = null;
+let categoryChartAmounts = [];
 
 uploadButton.addEventListener('click', async () => {
   const file = fileInput.files[0];
@@ -159,31 +161,43 @@ function renderBreakdown(table, items) {
 }
 
 function renderCategoryChart(items) {
-  categoryChart.replaceChildren();
   const visibleItems = items.filter((item) => item.count > 0);
-  if (!visibleItems.length) return;
-  const max = Math.max(...visibleItems.map((item) => Math.abs(item.amount)), 1);
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', `0 0 640 ${visibleItems.length * 42}`);
-  svg.setAttribute('aria-hidden', 'true');
-  visibleItems.forEach((item, index) => {
-    const y = index * 42 + 4;
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    label.setAttribute('x', '0');
-    label.setAttribute('y', String(y + 18));
-    label.textContent = item.name;
-    const bar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    bar.setAttribute('x', '140');
-    bar.setAttribute('y', String(y));
-    bar.setAttribute('width', String(Math.max(Math.abs(item.amount) / max * 440, 2)));
-    bar.setAttribute('height', '24');
-    const value = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    value.setAttribute('x', '590');
-    value.setAttribute('y', String(y + 18));
-    value.textContent = formatAmount(item.amount);
-    svg.append(label, bar, value);
+  const labels = visibleItems.map((item) => item.name);
+  const values = visibleItems.map((item) => Math.abs(item.amount));
+  categoryChartAmounts = visibleItems.map((item) => item.amount);
+
+  if (categoryChart) {
+    categoryChart.data.labels = labels;
+    categoryChart.data.datasets[0].data = values;
+    categoryChart.update();
+    return;
+  }
+
+  categoryChart = new Chart(categoryChartCanvas, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        borderWidth: 2,
+        hoverOffset: 8,
+      }],
+    },
+    options: {
+      cutout: '62%',
+      maintainAspectRatio: true,
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: (context) =>
+              `${context.label}: ${formatAmount(categoryChartAmounts[context.dataIndex])}`,
+          },
+        },
+      },
+    },
   });
-  categoryChart.appendChild(svg);
 }
 
 function formatAmount(amount) {

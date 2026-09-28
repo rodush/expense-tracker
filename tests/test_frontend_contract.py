@@ -25,7 +25,9 @@ def test_dashboard_ui_exposes_stable_controls_and_summary_regions() -> None:
         "filteredDownloadLink",
     ):
         assert f'id="{element_id}"' in html
+    assert '<script src="/static/vendor/chart.umd.min.js"></script>' in html
     assert '<script src="/static/app.js"></script>' in html
+    assert html.index("chart.umd.min.js") < html.index("/static/app.js")
 
 
 def test_dashboard_contract_fetches_summary_for_selected_filters() -> None:

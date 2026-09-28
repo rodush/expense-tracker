@@ -1,0 +1,10 @@
+{
+  "name": "expense-categorizer-frontend-assets",
+  "private": true,
+  "scripts": {
+    "vendor:chartjs": "node scripts/vendor-chartjs.mjs"
+  },
+  "dependencies": {
+    "chart.js": "4.5.1"
+  }
+}
