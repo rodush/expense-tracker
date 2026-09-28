@@ -164,16 +164,11 @@ function renderCategoryChart(items) {
   const visibleItems = items.filter((item) => item.count > 0);
   const labels = visibleItems.map((item) => item.name);
   const values = visibleItems.map((item) => Math.abs(item.amount));
-  const colors = ['#16794b', '#287bb5', '#bb641c', '#7957a5'];
-  const itemColors = visibleItems.map((item, index) =>
-    item.amount < 0 ? '#c14455' : colors[index % colors.length],
-  );
   categoryChartAmounts = visibleItems.map((item) => item.amount);
 
   if (categoryChart) {
     categoryChart.data.labels = labels;
     categoryChart.data.datasets[0].data = values;
-    categoryChart.data.datasets[0].backgroundColor = itemColors;
     categoryChart.update();
     return;
   }
@@ -184,7 +179,6 @@ function renderCategoryChart(items) {
       labels,
       datasets: [{
         data: values,
-        backgroundColor: itemColors,
         borderWidth: 2,
         hoverOffset: 8,
       }],

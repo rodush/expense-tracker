@@ -63,8 +63,8 @@ The dashboard renders category totals as a Chart.js 4.5.1 doughnut chart,
 loaded from the locally served `/static/vendor/chart.umd.min.js` asset. This
 keeps charts available without a third-party CDN at runtime. The chart updates
 with the selected filters; the category and person tables provide equivalent
-readable totals. Negative category totals appear as red slices sized by their
-absolute value, while tooltips and tables show the signed net amount.
+readable totals. Chart.js selects the doughnut slice colors for the available
+categories; tooltips and tables show the signed net amounts.
 
 The exact Chart.js dependency is pinned in `frontend/package.json`. To rebuild
 the checked-in browser asset after changing the dependency, run:

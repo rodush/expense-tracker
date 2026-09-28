@@ -36,9 +36,9 @@ The UI uses the pinned Chart.js 4.5.1 UMD build, served locally from
 `/static/vendor/chart.umd.min.js`. The responsive doughnut chart updates
 when filters change and has an equivalent category table as its text
 alternative. The category and person tables remain available when the chart
-has no data. Negative net category totals are red slices sized by their
-absolute value; tooltips and the table show signed totals. Filter options are
-populated from the uploaded preview because the summary response does not
-currently expose option metadata. The existing download remains an explicit
-full-dataset export, while the preview table is filtered locally to stay
-synchronized with the summary.
+has no data. Chart.js chooses the slice colors for the available categories;
+tooltips and the table show signed totals. Filter options are populated from
+the uploaded preview because the summary response does not currently expose
+option metadata. The existing download remains an explicit full-dataset
+export, while the preview table is filtered locally to stay synchronized with
+the summary.
