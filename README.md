@@ -9,10 +9,12 @@ The reporting workflow is designed as:
 1. **Upload**: the browser sends an expense file to `POST /upload`. The file
    must contain `date`, `amount`, and `description` columns. The service
    normalizes column names, excludes rows with positive amounts (card credits)
-   before categorization, converts retained debit amounts to absolute values,
-   derives `who`, assigns a configured category, and returns a preview. The
-   response's `row_count`, preview, dataset, and downloads contain only the
-   retained rows.
+   and SEPA transfers to `Savings Account` before categorization, converts
+   retained debit amounts to absolute values, derives `who`, assigns a
+   configured category, and returns a preview. The response's `row_count`,
+   preview, dataset, and downloads contain only the retained rows. Identical
+   input bytes and file types reuse processed rows from a one-hour in-memory
+   cache, avoiding repeat categorization.
 2. **Dataset**: the response includes a short-lived `dataset_id` for the
    normalized rows. The dataset is the shared source for the preview,
    summaries, and exports; it is not a second copy with different parsing
@@ -88,8 +90,9 @@ The vendored library's license is included beside the asset.
 ## Amounts, empty results, and exports
 
 - Amounts are parsed as numeric values during upload. Positive values are
-  treated as card credits and excluded before categorization; retained negative
-  debit values are stored and reported as their absolute values. Thus uploaded
+  treated as card credits, and SEPA transfers whose description names
+  `Savings Account` are excluded before categorization. Retained negative debit
+  values are stored and reported as their absolute values. Thus uploaded
   datasets contain expenses only, and `total_amount` is a gross spending total.
 - The reporting response should use one currency per uploaded dataset. Currency
   metadata and the final display precision must be defined before production
