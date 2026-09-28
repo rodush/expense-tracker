@@ -18,9 +18,9 @@ client = TestClient(app)
 def _upload_dataset() -> str:
     csv_content = (
         "date,amount,description\n"
-        "2026-07-01,10.00,PAS543 shop purchase\n"
-        "2026-07-02,20.00,kaartnummer: **5006 taxi\n"
-        "2026-07-03,-5.00,shared shop refund\n"
+        "2026-07-01,-10.00,PAS543 shop purchase\n"
+        "2026-07-02,-20.00,kaartnummer: **5006 taxi\n"
+        "2026-07-03,5.00,shared shop refund\n"
     )
     response = client.post(
         "/upload",
@@ -30,7 +30,7 @@ def _upload_dataset() -> str:
     return response.json()["dataset_id"]
 
 
-def test_upload_returns_dataset_id_and_summary_aggregates_signed_amounts() -> None:
+def test_upload_returns_dataset_id_and_summary_aggregates_debit_amounts() -> None:
     dataset_id = _upload_dataset()
 
     response = client.get(f"/datasets/{dataset_id}/summary")
@@ -38,11 +38,10 @@ def test_upload_returns_dataset_id_and_summary_aggregates_signed_amounts() -> No
     assert response.status_code == 200
     payload = response.json()
     assert payload["dataset_id"] == dataset_id
-    assert payload["total_amount"] == 25.0
-    assert payload["expense_count"] == 3
+    assert payload["total_amount"] == 30.0
+    assert payload["expense_count"] == 2
     assert payload["applied_filters"] == {"category": [], "who": []}
     assert {item["name"]: item for item in payload["who"]} == {
-        "General": {"name": "General", "amount": -5.0, "count": 1},
         "Oksana": {"name": "Oksana", "amount": 20.0, "count": 1},
         "Roman": {"name": "Roman", "amount": 10.0, "count": 1},
     }

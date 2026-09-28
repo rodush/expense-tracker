@@ -153,14 +153,19 @@ The endpoint should:
 
 ### 4. Handle amount semantics explicitly
 
-Before implementation, decide whether negative amounts represent refunds/income or whether they should be excluded. The summary must consistently define:
+During upload, exclude rows with positive amounts before categorization because
+they represent card credits. Treat negative input amounts as expenses by
+converting them to absolute values before categorization and storage. The
+preview, summary, and exports therefore contain expenses only and report
+nonnegative amounts. The summary must consistently define:
 
 - Gross total versus net total.
 - Currency handling.
 - Rounding rules.
 - Empty-result behavior.
 
-Recommended default: treat uploaded amounts as signed values, aggregate net totals, and return zero-valued chart data with an explanatory empty state when filters match nothing.
+Return zero-valued chart data with an explanatory empty state when filters
+match nothing.
 
 ### 5. Reuse the same normalized rows
 
