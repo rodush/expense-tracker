@@ -7,11 +7,13 @@ This project is a small FastAPI-based expense categorization app that reads uplo
 The reporting workflow is designed as:
 
 1. **Upload**: the browser sends an expense file to `POST /upload`. The file
-   must contain `date`, `amount`, and `description` columns. The service
-   normalizes column names, excludes rows with positive amounts (card credits)
-   and SEPA transfers to `Savings Account` before categorization, converts
-   retained debit amounts to absolute values, derives `who`, assigns a
-   configured category, and returns a preview. The response's `row_count`,
+   must contain `date`, `amount`, and `description` columns. ABN AMRO headers
+   `Transactiedatum`, `Transactiebedrag`, and `Omschrijving` are mapped to those
+   English field names during processing. The service normalizes column names,
+   excludes rows with positive amounts (card credits) and SEPA transfers to
+   `Savings Account` before categorization, converts retained debit amounts to
+   absolute values, derives `who`, assigns a configured category, and returns a
+   preview. The response's `row_count`,
    preview, dataset, and downloads contain only the retained rows. Identical
    input bytes and file types reuse processed rows from a one-hour in-memory
    cache, avoiding repeat categorization.
