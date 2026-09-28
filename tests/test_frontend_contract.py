@@ -49,6 +49,37 @@ def test_uploaded_values_are_rendered_as_text_not_html() -> None:
     assert "${row." not in javascript
 
 
+def test_preview_table_is_collapsible_and_description_is_last_and_bounded() -> None:
+    html = INDEX_HTML.read_text(encoding="utf-8")
+
+    assert "<details>" in html
+    assert "<summary>Categorized expenses (preview)</summary>" in html
+    assert html.index("<th>Category</th>") < html.index("<th>Description</th>")
+    assert '<col class="description-column">' in html
+    assert "#resultsTable col.description-column" in html
+    assert "width: 300px;" in html
+    assert "text-overflow: ellipsis;" in html
+    assert 'id="descriptionTooltip"' in html
+
+
+def test_description_tooltip_tracks_pointer_and_repositions_at_viewport_edges() -> None:
+    javascript = APP_JS.read_text(encoding="utf-8")
+
+    assert "positionDescriptionTooltip(event.clientX, event.clientY)" in javascript
+    assert "window.innerWidth" in javascript
+    assert "window.innerHeight" in javascript
+    assert "cell.setAttribute('aria-describedby', 'descriptionTooltip')" in javascript
+
+
+def test_category_chart_assigns_a_unique_color_per_returned_category() -> None:
+    javascript = APP_JS.read_text(encoding="utf-8")
+
+    assert "new Map(items.map((item) => [item.name, item]))" in javascript
+    assert "categories.map((_, index) => `hsl(" in javascript
+    assert "categoryChart.data.datasets[0].backgroundColor = colors;" in javascript
+    assert "backgroundColor: colors," in javascript
+
+
 def test_dashboard_contract_surfaces_upload_and_summary_failures() -> None:
     javascript = APP_JS.read_text(encoding="utf-8")
 
