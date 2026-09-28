@@ -52,7 +52,7 @@ dataset returns 404; invalid filters or malformed amounts return a clear 400
 response, and a dataset must never be used to read another dataset's rows.
 
 This contract aligns with the reporting specifications in
-[`.github/specs/16-dataset-and-summary-api.md`](.github/specs/16-dataset-and-summary-api.md)
+[`.github/specs/archive/16-dataset-and-summary-api.md`](.github/specs/archive/16-dataset-and-summary-api.md)
 and [`.github/specs/milestone-2.md`](.github/specs/milestone-2.md). If the API
 implementation requires a field change, update those documents and this
 section together.
