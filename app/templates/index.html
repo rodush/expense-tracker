@@ -18,22 +18,9 @@
       grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
     }
 
-    .chart {
-      min-height: 16rem;
-    }
-
-    .chart svg {
-      height: 16rem;
-      width: 100%;
-    }
-
-    .chart text {
-      fill: currentColor;
-      font-size: 0.75rem;
-    }
-
-    .chart rect {
-      fill: var(--pico-primary);
+    .chart-container {
+      height: 22rem;
+      position: relative;
     }
   </style>
 </head>
@@ -114,8 +101,11 @@
         </div>
         <article>
           <header><strong>Spending by category</strong></header>
-          <div id="categoryChart" class="chart" role="img"
-            aria-label="Bar chart showing spending by category"></div>
+          <small>Negative net category totals appear in red; slice size shows the absolute amount.</small>
+          <div class="chart-container">
+            <canvas id="categoryChart" role="img"
+              aria-label="Doughnut chart showing spending by category"></canvas>
+          </div>
           <table id="categoryTable">
             <caption>Category totals</caption>
             <thead><tr><th>Category</th><th>Amount</th><th>Count</th></tr></thead>
@@ -134,6 +124,7 @@
     </section>
   </main>
   <footer class="container"><em>Experimenting with Python and FastAPI &dash; &copy; 2026</em></footer>
+  <script src="/static/vendor/chart.umd.min.js"></script>
   <script src="/static/app.js"></script>
 </body>
 

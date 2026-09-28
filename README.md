@@ -57,6 +57,26 @@ and [`.github/specs/milestone-2.md`](.github/specs/milestone-2.md). If the API
 implementation requires a field change, update those documents and this
 section together.
 
+## Dashboard charts
+
+The dashboard renders category totals as a Chart.js 4.5.1 doughnut chart,
+loaded from the locally served `/static/vendor/chart.umd.min.js` asset. This
+keeps charts available without a third-party CDN at runtime. The chart updates
+with the selected filters; the category and person tables provide equivalent
+readable totals. Negative category totals appear as red slices sized by their
+absolute value, while tooltips and tables show the signed net amount.
+
+The exact Chart.js dependency is pinned in `frontend/package.json`. To rebuild
+the checked-in browser asset after changing the dependency, run:
+
+```bash
+cd frontend
+npm ci
+npm run vendor:chartjs
+```
+
+The vendored library's license is included beside the asset.
+
 ## Amounts, empty results, and exports
 
 - Amounts are parsed as signed numeric values. Negative values are retained as
