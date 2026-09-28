@@ -116,3 +116,10 @@ uv run ty check
 ```
 
 Attempt to fix types accurately. Silencing the error should really be the last resort!
+
+## Worktrees, focused commits, and pull requests
+
+- Create an independent worktree and branch for each independent change, rather than combining unrelated work in one branch or pull request.
+- Keep each pull request small and focused on one change; split independent fixes, features, or documentation updates into separate pull requests.
+- Before delivery, run the relevant validation, review the complete diff, commit the focused changes, publish the branch, and create a pull request with a concise summary and validation results.
+- Do not report work as delivered until it is committed and its pull request has been created. Never publish or create a pull request without the user's request or approval.
