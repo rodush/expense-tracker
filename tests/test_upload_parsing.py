@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,8 +19,8 @@ client = TestClient(app)
 def test_upload_accepts_csv_and_adds_category_column() -> None:
     csv_content = (
         "date,amount,description\n"
-        "2026-07-01,15.50,PAS543 Coffee Shop\n"
-        "2026-07-02,48.00,KAARTNUMMER: **5006 Office supplies\n"
+        "2026-07-01,-15.50,PAS543 Coffee Shop\n"
+        "2026-07-02,-48.00,KAARTNUMMER: **5006 Office supplies\n"
     )
 
     response = client.post(
@@ -42,6 +43,39 @@ def test_upload_accepts_csv_and_adds_category_column() -> None:
     assert payload["preview"][1]["who"] == "Oksana"
 
 
+def test_upload_filters_credits_before_categorization_and_uses_absolute_debits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    categorized_input: list[dict[str, Any]] = []
+
+    async def categorize(
+        rows: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        categorized_input.extend(rows)
+        return [{**row, "category": "Food"} for row in rows]
+
+    monkeypatch.setattr("app.main.categorize_dataframe_async", categorize)
+    csv_content = (
+        "date,amount,description\n"
+        "2026-07-01,-15.50,Coffee\n"
+        "2026-07-02,120.00,Card top-up\n"
+        "2026-07-03,0.001,Small credit\n"
+        "2026-07-04,-2.75,Lunch\n"
+    )
+
+    response = client.post(
+        "/upload",
+        files={"file": ("expenses.csv", csv_content.encode(), "text/csv")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(categorized_input) == 2
+    assert [row["amount"] for row in categorized_input] == [15.5, 2.75]
+    assert payload["row_count"] == 2
+    assert [row["amount"] for row in payload["preview"]] == [15.5, 2.75]
+
+
 def test_preview_renderer_uses_text_nodes_for_uploaded_values() -> None:
     app_js = Path("app/static/app.js").read_text(encoding="utf-8")
 
@@ -55,7 +89,7 @@ def test_full_download_remains_available_as_the_categorized_csv() -> None:
         files={
             "file": (
                 "expenses.csv",
-                b"date,amount,description\n2026-07-01,15.50,Coffee\n",
+                b"date,amount,description\n2026-07-01,-15.50,Coffee\n",
                 "text/csv",
             )
         },

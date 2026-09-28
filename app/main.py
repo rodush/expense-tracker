@@ -147,7 +147,11 @@ def get_ui() -> FileResponse:
 async def upload_expense_file(
     file: Annotated[UploadFile, File(...)],
 ) -> dict[str, Any]:
-    """Accept an expense spreadsheet, normalize its columns, and return metadata."""
+    """Categorize debit rows only and return their normalized amounts.
+
+    Positive credit rows are excluded before categorization; retained amounts
+    and the returned row count reflect only expenses.
+    """
     logger.info("Upload requested", extra={"file_name": file.filename})
     if file.filename is None:
         raise HTTPException(status_code=400, detail="A file name is required.")
@@ -197,6 +201,21 @@ async def upload_expense_file(
             detail=f"Missing required columns: {', '.join(missing_columns)}",
         )
 
+    try:
+        parsed_amounts = dataframe["amount"].map(parse_amount)
+    except (TypeError, ValueError) as exc:
+        logger.warning(
+            "Upload contains an invalid amount", extra={"file_name": file.filename}
+        )
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    credit_rows = dataframe["amount"].map(
+        lambda amount: Decimal(str(amount).strip()) > Decimal("0.00")
+    )
+    debit_rows = ~credit_rows
+    dataframe = dataframe.loc[debit_rows].copy()
+    dataframe["amount"] = parsed_amounts.loc[debit_rows].abs().astype(float)
+
     dataframe["who"] = (
         dataframe["description"]
         .fillna("")
@@ -216,7 +235,7 @@ async def upload_expense_file(
     dataframe = dataframe.assign(category=[row["category"] for row in categorized_rows])
     try:
         normalized_dataset_rows = normalize_rows(dataframe.to_dict(orient="records"))
-    except ValueError as exc:
+    except (TypeError, ValueError) as exc:
         logger.warning(
             "Upload contains an invalid amount", extra={"file_name": file.filename}
         )

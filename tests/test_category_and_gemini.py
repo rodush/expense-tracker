@@ -251,7 +251,7 @@ def test_ui_route_serves_the_browser_page() -> None:
 
 
 def test_upload_returns_downloadable_csv_file() -> None:
-    csv_content = "date,amount,description\n2026-07-01,15.50,PAS543 Coffee Shop\n"
+    csv_content = "date,amount,description\n2026-07-01,-15.50,PAS543 Coffee Shop\n"
 
     response = client.post(
         "/upload",
