@@ -5,12 +5,14 @@
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "inference.custom.format": "codellama",
-    "python-envs.defaultEnvManager": "ms-python.python:system",
-    "python-envs.pythonProjects": [
-        {
-            "path": ".",
-            "envManager": "ms-python.python:system",
-            "packageManager": "ms-python.python:pip"
-        }
-    ]
+    "python-envs.defaultEnvManager": "ms-python.python:venv",
+    "chat.tools.terminal.autoApprove": {
+        "git remote": true,
+        "uv": true,
+        "git switch": true,
+        "git add": true,
+        "git commit": true,
+        "git rev-parse": true,
+        "git push": true
+    }
 }
