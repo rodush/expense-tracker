@@ -43,6 +43,25 @@ def test_upload_accepts_csv_and_adds_category_column() -> None:
     assert payload["preview"][1]["who"] == "Oksana"
 
 
+def test_upload_normalizes_dutch_bank_column_names() -> None:
+    csv_content = (
+        "Transactiedatum,Transactiebedrag,Omschrijving\n"
+        "2026-07-01,-15.50,PAS543 Coffee Shop\n"
+    )
+
+    response = client.post(
+        "/upload",
+        files={"file": ("expenses.csv", csv_content.encode("utf-8"), "text/csv")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["columns"] == ["date", "amount", "description", "who", "category"]
+    assert payload["preview"][0]["date"] == "2026-07-01"
+    assert payload["preview"][0]["amount"] == 15.5
+    assert payload["preview"][0]["description"] == "PAS543 Coffee Shop"
+
+
 def test_upload_filters_credits_before_categorization_and_uses_absolute_debits(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

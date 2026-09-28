@@ -97,6 +97,11 @@ app.include_router(websocket.router)
 
 ALLOWED_EXTENSIONS = {".csv", ".xls", ".xlsx"}
 REQUIRED_COLUMNS = {"date", "amount", "description"}
+COLUMN_ALIASES = {
+    "transactiebedrag": "amount",
+    "omschrijving": "description",
+    "transactiedatum": "date",
+}
 MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
 UI_TEMPLATE_FILE = Path(__file__).parent / "templates" / "index.html"
 DOWNLOADS_DIR = Path.cwd() / ".tmp"
@@ -115,6 +120,11 @@ def _is_savings_transfer(description: Any) -> bool:
         "sepa overboeking" in normalized_description
         and "naam: savings account" in normalized_description
     )
+
+
+def _normalize_column_name(column: Any) -> str:
+    normalized_column = str(column).strip().lower()
+    return COLUMN_ALIASES.get(normalized_column, normalized_column)
 
 
 def _load_spreadsheet(raw_content: bytes, file_extension: str) -> pd.DataFrame:
@@ -212,7 +222,7 @@ async def upload_expense_file(
                 status_code=400, detail="Unable to parse file content."
             ) from exc
 
-        dataframe = dataframe.rename(columns=lambda column: str(column).strip().lower())
+        dataframe = dataframe.rename(columns=_normalize_column_name)
 
         missing_columns = sorted(REQUIRED_COLUMNS.difference(dataframe.columns))
         if missing_columns:
