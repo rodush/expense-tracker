@@ -3,6 +3,7 @@ const uploadButton = document.getElementById('uploadButton');
 const loading = document.getElementById('loading');
 const errorBox = document.getElementById('error');
 const resultsTable = document.getElementById('resultsTable');
+const descriptionTooltip = document.getElementById('descriptionTooltip');
 const downloadLink = document.getElementById('downloadLink');
 const filteredDownloadLink = document.getElementById('filteredDownloadLink');
 const dashboard = document.getElementById('dashboard');
@@ -25,6 +26,7 @@ let previewRows = [];
 let summaryRequest = null;
 let categoryChart = null;
 let categoryChartAmounts = [];
+let tooltipCell = null;
 
 uploadButton.addEventListener('click', async () => {
   const file = fileInput.files[0];
@@ -74,16 +76,78 @@ uploadButton.addEventListener('click', async () => {
 function renderRows(rows) {
   const body = resultsTable.querySelector('tbody');
   body.innerHTML = '';
+  hideDescriptionTooltip();
 
   for (const row of rows) {
     const tr = document.createElement('tr');
-    for (const value of [row.date, row.amount, row.description, row.who, row.category]) {
+    [row.date, row.amount, row.who, row.category, row.description].forEach((value, index) => {
       const cell = document.createElement('td');
       cell.textContent = value ?? '';
+      if (index === 4) {
+        cell.classList.add('description-cell');
+        cell.tabIndex = 0;
+      }
       tr.appendChild(cell);
-    }
+    });
     body.appendChild(tr);
   }
+}
+
+resultsTable.addEventListener('mouseover', (event) => {
+  const cell = event.target.closest('.description-cell');
+  if (cell) showDescriptionTooltip(cell, event.clientX, event.clientY);
+});
+
+resultsTable.addEventListener('mousemove', (event) => {
+  const cell = event.target.closest('.description-cell');
+  if (cell && cell === tooltipCell) {
+    positionDescriptionTooltip(event.clientX, event.clientY);
+  }
+});
+
+resultsTable.addEventListener('mouseout', (event) => {
+  const cell = event.target.closest('.description-cell');
+  if (cell && !cell.contains(event.relatedTarget)) hideDescriptionTooltip();
+});
+
+resultsTable.addEventListener('focusin', (event) => {
+  const cell = event.target.closest('.description-cell');
+  if (!cell) return;
+  const bounds = cell.getBoundingClientRect();
+  showDescriptionTooltip(cell, bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+});
+
+resultsTable.addEventListener('focusout', (event) => {
+  const cell = event.target.closest('.description-cell');
+  if (cell && !cell.contains(event.relatedTarget)) hideDescriptionTooltip();
+});
+
+function showDescriptionTooltip(cell, x, y) {
+  tooltipCell = cell;
+  descriptionTooltip.textContent = cell.textContent;
+  descriptionTooltip.hidden = false;
+  cell.setAttribute('aria-describedby', 'descriptionTooltip');
+  positionDescriptionTooltip(x, y);
+}
+
+function positionDescriptionTooltip(x, y) {
+  const margin = 8;
+  const offset = 14;
+  const bounds = descriptionTooltip.getBoundingClientRect();
+  const left = x + offset + bounds.width > window.innerWidth - margin
+    ? x - bounds.width - offset
+    : x + offset;
+  const top = y + offset + bounds.height > window.innerHeight - margin
+    ? y - bounds.height - offset
+    : y + offset;
+  descriptionTooltip.style.left = `${Math.max(margin, Math.min(left, window.innerWidth - bounds.width - margin))}px`;
+  descriptionTooltip.style.top = `${Math.max(margin, Math.min(top, window.innerHeight - bounds.height - margin))}px`;
+}
+
+function hideDescriptionTooltip() {
+  tooltipCell?.removeAttribute('aria-describedby');
+  tooltipCell = null;
+  descriptionTooltip.hidden = true;
 }
 
 function populateFilters(rows) {
@@ -161,14 +225,16 @@ function renderBreakdown(table, items) {
 }
 
 function renderCategoryChart(items) {
-  const visibleItems = items.filter((item) => item.count > 0);
-  const labels = visibleItems.map((item) => item.name);
-  const values = visibleItems.map((item) => Math.abs(item.amount));
-  categoryChartAmounts = visibleItems.map((item) => item.amount);
+  const categories = [...new Map(items.map((item) => [item.name, item])).values()];
+  const labels = categories.map((item) => item.name);
+  const values = categories.map((item) => Math.abs(item.amount));
+  const colors = categories.map((_, index) => `hsl(${(index * 360) / categories.length} 70% 48%)`);
+  categoryChartAmounts = categories.map((item) => item.amount);
 
   if (categoryChart) {
     categoryChart.data.labels = labels;
     categoryChart.data.datasets[0].data = values;
+    categoryChart.data.datasets[0].backgroundColor = colors;
     categoryChart.update();
     return;
   }
@@ -179,6 +245,7 @@ function renderCategoryChart(items) {
       labels,
       datasets: [{
         data: values,
+        backgroundColor: colors,
         borderWidth: 2,
         hoverOffset: 8,
       }],
