@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import logging
 import time
 import uuid
@@ -28,6 +29,7 @@ from app.services.gemini_service import (
     categorize_dataframe_async,
     determine_who_from_description,
 )
+from app.services.upload_cache import processed_upload_cache
 
 from .routers import websocket
 
@@ -107,6 +109,14 @@ def _is_safe_filename(filename: str | None) -> bool:
     return candidate == filename and candidate not in {"", ".", ".."}
 
 
+def _is_savings_transfer(description: Any) -> bool:
+    normalized_description = " ".join(str(description).casefold().split())
+    return (
+        "sepa overboeking" in normalized_description
+        and "naam: savings account" in normalized_description
+    )
+
+
 def _load_spreadsheet(raw_content: bytes, file_extension: str) -> pd.DataFrame:
     if file_extension == ".csv":
         return pd.read_csv(BytesIO(raw_content))
@@ -149,8 +159,9 @@ async def upload_expense_file(
 ) -> dict[str, Any]:
     """Categorize debit rows only and return their normalized amounts.
 
-    Positive credit rows are excluded before categorization; retained amounts
-    and the returned row count reflect only expenses.
+    Positive credit rows and savings transfers are excluded before
+    categorization; retained amounts and the returned row count reflect only
+    expenses.
     """
     logger.info("Upload requested", extra={"file_name": file.filename})
     if file.filename is None:
@@ -178,68 +189,86 @@ async def upload_expense_file(
             detail="Uploaded file is too large.",
         )
 
-    try:
-        dataframe = _load_spreadsheet(raw_content, file_extension)
-    except Exception as exc:
-        logger.exception(
-            "Failed to parse uploaded spreadsheet", extra={"file_name": file.filename}
+    cache_key = hashlib.sha256(
+        file_extension.encode("ascii") + b"\0" + raw_content
+    ).hexdigest()
+    cached_upload = processed_upload_cache.get(cache_key)
+    if cached_upload is not None:
+        dataframe = pd.DataFrame(
+            cached_upload.rows, columns=list(cached_upload.columns)
         )
-        raise HTTPException(
-            status_code=400, detail="Unable to parse file content."
-        ) from exc
+        category_column_added = cached_upload.category_column_added
+        normalized_dataset_rows = normalize_rows(cached_upload.rows)
+        logger.info("upload.cache_hit", extra={"operation": "upload_cache"})
+    else:
+        try:
+            dataframe = _load_spreadsheet(raw_content, file_extension)
+        except Exception as exc:
+            logger.exception(
+                "Failed to parse uploaded spreadsheet",
+                extra={"file_name": file.filename},
+            )
+            raise HTTPException(
+                status_code=400, detail="Unable to parse file content."
+            ) from exc
 
-    dataframe = dataframe.rename(columns=lambda column: str(column).strip().lower())
+        dataframe = dataframe.rename(columns=lambda column: str(column).strip().lower())
 
-    missing_columns = sorted(REQUIRED_COLUMNS.difference(dataframe.columns))
-    if missing_columns:
-        logger.warning(
-            "Upload missing required columns",
-            extra={"file_name": file.filename, "missing_columns": missing_columns},
+        missing_columns = sorted(REQUIRED_COLUMNS.difference(dataframe.columns))
+        if missing_columns:
+            logger.warning(
+                "Upload missing required columns",
+                extra={"file_name": file.filename, "missing_columns": missing_columns},
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing required columns: {', '.join(missing_columns)}",
+            )
+
+        try:
+            parsed_amounts = dataframe["amount"].map(parse_amount)
+        except (TypeError, ValueError) as exc:
+            logger.warning(
+                "Upload contains an invalid amount", extra={"file_name": file.filename}
+            )
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        credit_rows = dataframe["amount"].map(
+            lambda amount: Decimal(str(amount).strip()) > Decimal("0.00")
         )
-        raise HTTPException(
-            status_code=400,
-            detail=f"Missing required columns: {', '.join(missing_columns)}",
+        savings_transfer_rows = dataframe["description"].map(_is_savings_transfer)
+        expense_rows = ~(credit_rows | savings_transfer_rows)
+        dataframe = dataframe.loc[expense_rows].copy()
+        dataframe["amount"] = parsed_amounts.loc[expense_rows].abs().astype(float)
+
+        dataframe["who"] = (
+            dataframe["description"]
+            .fillna("")
+            .astype(str)
+            .apply(determine_who_from_description)
         )
 
-    try:
-        parsed_amounts = dataframe["amount"].map(parse_amount)
-    except (TypeError, ValueError) as exc:
-        logger.warning(
-            "Upload contains an invalid amount", extra={"file_name": file.filename}
+        category_column_added = "category" not in dataframe.columns
+        if category_column_added:
+            dataframe["category"] = "Other"
+
+        normalized_rows: list[dict[str, Any]] = [
+            {str(key): value for key, value in row.items()}
+            for row in dataframe.to_dict(orient="records")
+        ]
+        categorized_rows = await categorize_dataframe_async(normalized_rows)
+        dataframe = dataframe.assign(
+            category=[row["category"] for row in categorized_rows]
         )
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    credit_rows = dataframe["amount"].map(
-        lambda amount: Decimal(str(amount).strip()) > Decimal("0.00")
-    )
-    debit_rows = ~credit_rows
-    dataframe = dataframe.loc[debit_rows].copy()
-    dataframe["amount"] = parsed_amounts.loc[debit_rows].abs().astype(float)
-
-    dataframe["who"] = (
-        dataframe["description"]
-        .fillna("")
-        .astype(str)
-        .apply(determine_who_from_description)
-    )
-
-    category_column_added = "category" not in dataframe.columns
-    if category_column_added:
-        dataframe["category"] = "Other"
-
-    normalized_rows: list[dict[str, Any]] = [
-        {str(key): value for key, value in row.items()}
-        for row in dataframe.to_dict(orient="records")
-    ]
-    categorized_rows = await categorize_dataframe_async(normalized_rows)
-    dataframe = dataframe.assign(category=[row["category"] for row in categorized_rows])
-    try:
-        normalized_dataset_rows = normalize_rows(dataframe.to_dict(orient="records"))
-    except (TypeError, ValueError) as exc:
-        logger.warning(
-            "Upload contains an invalid amount", extra={"file_name": file.filename}
-        )
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        try:
+            normalized_dataset_rows = normalize_rows(
+                dataframe.to_dict(orient="records")
+            )
+        except (TypeError, ValueError) as exc:
+            logger.warning(
+                "Upload contains an invalid amount", extra={"file_name": file.filename}
+            )
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     download_id = str(uuid.uuid4())
     output_path = DOWNLOADS_DIR / f"categorized_{download_id}.csv"
@@ -247,6 +276,13 @@ async def upload_expense_file(
         DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
         dataframe.to_csv(output_path, index=False)
         dataset_id = dataset_store.create(normalized_dataset_rows)
+        if cached_upload is None:
+            processed_upload_cache.put(
+                cache_key,
+                dataframe.to_dict(orient="records"),
+                dataframe.columns,
+                category_column_added,
+            )
     except OSError as exc:
         logger.exception(
             "Failed to persist categorized upload",

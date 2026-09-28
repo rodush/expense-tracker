@@ -60,7 +60,10 @@ def test_upload_filters_credits_before_categorization_and_uses_absolute_debits(
         "2026-07-01,-15.50,Coffee\n"
         "2026-07-02,120.00,Card top-up\n"
         "2026-07-03,0.001,Small credit\n"
-        "2026-07-04,-2.75,Lunch\n"
+        "2026-07-04,-500.00,SEPA Overboeking                 "
+        "IBAN: TEST        BIC: TEST                    "
+        "Naam: Savings Account           Kenmerk: NOTPROVIDED\n"
+        "2026-07-05,-2.75,Lunch\n"
     )
 
     response = client.post(
@@ -74,6 +77,40 @@ def test_upload_filters_credits_before_categorization_and_uses_absolute_debits(
     assert [row["amount"] for row in categorized_input] == [15.5, 2.75]
     assert payload["row_count"] == 2
     assert [row["amount"] for row in payload["preview"]] == [15.5, 2.75]
+
+
+def test_reuploading_identical_input_reuses_processed_data(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    categorized_batches: list[list[dict[str, Any]]] = []
+
+    async def categorize(
+        rows: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        categorized_batches.append(rows)
+        return [{**row, "category": "Food"} for row in rows]
+
+    monkeypatch.setattr("app.main.categorize_dataframe_async", categorize)
+    monkeypatch.setattr("app.main.DOWNLOADS_DIR", tmp_path)
+    csv_content = b"date,amount,description\n2026-07-01,-15.50,Coffee\n"
+
+    first_response = client.post(
+        "/upload",
+        files={"file": ("expenses.csv", csv_content, "text/csv")},
+    )
+    second_response = client.post(
+        "/upload",
+        files={"file": ("renamed.csv", csv_content, "text/csv")},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    first_payload = first_response.json()
+    second_payload = second_response.json()
+    assert len(categorized_batches) == 1
+    assert first_payload["preview"] == second_payload["preview"]
+    assert first_payload["dataset_id"] != second_payload["dataset_id"]
+    assert client.get(f"/download/{second_payload['download_id']}").status_code == 200
 
 
 def test_preview_renderer_uses_text_nodes_for_uploaded_values() -> None:
