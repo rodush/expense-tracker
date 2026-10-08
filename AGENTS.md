@@ -6,7 +6,9 @@ applyTo: "**"
 
 ## Sensitive instructions for AI coding agents
 
-This repository is a Python-based project. Treat all changes as production-adjacent and follow these rules strictly.
+This repository is a Python-based project.
+Frontend for now is implemented as vanilla javascript with PicoCSS styling library.
+Treat all changes as production-adjacent and follow these rules strictly.
 
 ### 1. Security and secrets
 - Never hardcode credentials, tokens, API keys, private endpoints, personal data, or secrets.
@@ -34,8 +36,13 @@ This repository is a Python-based project. Treat all changes as production-adjac
 - Avoid broad exception swallowing. Fail loudly and handle expected errors explicitly.
 - Use `pathlib`, `logging`, and standard library tooling where possible instead of ad hoc patterns.
 - Keep imports sorted and remove unused imports.
-- Create clean idiomatic Python code
-- Avoid spaghetti-code, structure business logic into re-usable functions and modules
+- Create clean idiomatic Python code.
+- Avoid spaghetti-code, structure business logic into re-usable functions and modules.
+
+#### 4.1 FastAPI specific guidance
+- Use latest version of FastAPI (v0.141+) and features provided by that version.
+- Use advanced techniques when creating code: advanced custom types, proper response models, etc.
+- For external services (http clients) - as well as internal services - structure the code using Dependency Injection ("Depends()" from FastAPI) pattern, for the sake of easier testability and cleaner code structure.
 
 ### 5. Data handling
 - Treat all customer, financial, and personal data as sensitive.
@@ -43,10 +50,11 @@ This repository is a Python-based project. Treat all changes as production-adjac
 - Avoid writing temporary files into shared directories unless the task requires it.
 
 ### 6. Testing and validation
-- Follow TDD approach.
+- Follow TDD approach!
 - Run the relevant tests for any Python change when feasible.
 - When fixing an issue make sure the broken test is created first, and make sure it passes after the fix is implemented.
 - Do not claim tests pass unless they were actually run.
+- Do not create nonsense tests that verify obvious things and increase test coupling.
 - Run Python tests from the local directory where `pytest` is installed in the `.venv` with `uv`:
 
 Run command while in the workspace directory (expense-tracker):
@@ -61,6 +69,7 @@ uv run pytest
 
 ```sh
 npm run test
+node --check app/static/app.js
 ```
 
 - Frontend tests are not currently configured. Until they are added, it is
