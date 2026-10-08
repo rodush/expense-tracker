@@ -121,5 +121,5 @@ Attempt to fix types accurately. Silencing the error should really be the last r
 
 - Create an independent worktree and branch for each independent change, rather than combining unrelated work in one branch or pull request.
 - Keep each pull request small and focused on one change; split independent fixes, features, or documentation updates into separate pull requests.
-- Before delivery, run the relevant validation, review the complete diff, commit the focused changes, publish the branch, and create a pull request with a concise summary and validation results.
-- Do not report work as delivered until it is committed and its pull request has been created. Never publish or create a pull request without the user's request or approval.
+- After relevant validation passes, review the complete diff, commit the focused changes using the repository's commit convention, push the branch, and create a pull request with a concise summary and validation results. This is the default delivery workflow and standing user authorization; do not wait for a separate request to commit, push, or open the PR.
+- Do not report work as delivered until it is committed and its pull request has been created. Skip publication only when the user explicitly opts out or when a concrete blocker prevents safe delivery; explain the blocker rather than silently stopping.

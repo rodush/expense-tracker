@@ -29,6 +29,16 @@ The implementation provides a temporary full CSV download through
 The browser dashboard uses the same dataset and summary contract for its
 filter controls, tables, and chart.
 
+## Python application structure
+
+`app/main.py` creates the FastAPI application and wires its services. Upload
+and dataset endpoints live in separate routers; their processing and reporting
+logic is handled by `UploadService` and `DatasetService` in `app/services/`.
+Routers obtain these services with FastAPI dependencies, so tests can replace
+them through `app.dependency_overrides` without patching application globals.
+`create_app` also accepts the stores, cache, categorizer, and output directory
+for explicit application-level wiring.
+
 `POST /upload` returns `row_count`, `category_column_added`, `columns`,
 `preview`, `download_id`, and `dataset_id`. `row_count` and `preview` include
 only retained rows, and each returned `amount` is a nonnegative numeric value.
