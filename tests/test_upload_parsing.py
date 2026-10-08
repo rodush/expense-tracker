@@ -7,13 +7,30 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import MAX_UPLOAD_SIZE_BYTES
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.dependencies import get_upload_service
 from app.main import app
+from app.services.upload_service import MAX_UPLOAD_SIZE_BYTES, UploadService
 
 client = TestClient(app)
+
+
+def _override_upload_service(
+    monkeypatch: pytest.MonkeyPatch,
+    categorize=None,
+    downloads_dir: Path | None = None,
+) -> UploadService:
+    configured_service: UploadService = app.state.upload_service
+    service = UploadService(
+        dataset_store=configured_service.dataset_store,
+        upload_cache=configured_service.upload_cache,
+        categorize=categorize or configured_service.categorize,
+        determine_who=configured_service.determine_who,
+        downloads_dir=downloads_dir or configured_service.downloads_dir,
+    )
+    monkeypatch.setitem(app.dependency_overrides, get_upload_service, lambda: service)
+    return service
 
 
 def test_upload_accepts_csv_and_adds_category_column() -> None:
@@ -73,7 +90,7 @@ def test_upload_filters_credits_before_categorization_and_uses_absolute_debits(
         categorized_input.extend(rows)
         return [{**row, "category": "Food"} for row in rows]
 
-    monkeypatch.setattr("app.main.categorize_dataframe_async", categorize)
+    _override_upload_service(monkeypatch, categorize=categorize)
     csv_content = (
         "date,amount,description\n"
         "2026-07-01,-15.50,Coffee\n"
@@ -109,8 +126,7 @@ def test_reuploading_identical_input_reuses_processed_data(
         categorized_batches.append(rows)
         return [{**row, "category": "Food"} for row in rows]
 
-    monkeypatch.setattr("app.main.categorize_dataframe_async", categorize)
-    monkeypatch.setattr("app.main.DOWNLOADS_DIR", tmp_path)
+    _override_upload_service(monkeypatch, categorize=categorize, downloads_dir=tmp_path)
     csv_content = b"date,amount,description\n2026-07-01,-15.50,Coffee\n"
 
     first_response = client.post(
@@ -196,7 +212,7 @@ def test_upload_returns_retryable_error_when_output_cannot_be_saved(
 ) -> None:
     output_path = tmp_path / "not-a-directory"
     output_path.write_text("blocking path", encoding="utf-8")
-    monkeypatch.setattr("app.main.DOWNLOADS_DIR", output_path)
+    _override_upload_service(monkeypatch, downloads_dir=output_path)
 
     response = client.post(
         "/upload",
