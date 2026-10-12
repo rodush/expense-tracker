@@ -5,3 +5,4 @@ __pycache__/
 .tmp
 .worktrees/
 frontend/node_modules/
+app/static/frontend/

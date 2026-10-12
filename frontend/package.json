@@ -1,8 +1,8 @@
 {
-  "name": "expense-categorizer-frontend-assets",
+  "name": "expense-categorizer-frontend",
   "private": true,
   "scripts": {
-    "vendor:chartjs": "node scripts/vendor-chartjs.mjs"
+    "build": "vite build"
   },
   "dependencies": {
     "chart.js": "4.5.1"
