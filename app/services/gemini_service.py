@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 from collections.abc import Iterable, Mapping
 from typing import Any
@@ -86,7 +87,7 @@ def _call_gemini_batch(
     fallback_category: str | None = None,
     api_key: str | None = None,
 ) -> dict[int, str] | None:
-    api_key = api_key or settings.gemini_api_key
+    api_key = api_key or settings.gemini_api_key or os.getenv("GEMINI_API_KEY")
     if not api_key:
         return None
 
