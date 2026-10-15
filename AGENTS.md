@@ -130,6 +130,12 @@ asset paths change.
   commit convention, push the branch, and open a concise pull request. This is
   standing authorization. If publication is blocked, report the concrete
   blocker rather than claiming delivery.
+- Monitor the pull request's required status checks after pushing and keep
+  working until they pass. Inspect failed job logs, fix failures caused by the
+  change, run the relevant checks locally, push the fix, and re-check the PR.
+  Do not treat a failed or pending check as green. If a check fails only because
+  an external AI service exhausted its credits or rate limit, record that
+  limitation clearly; continue fixing any other actionable failures.
 - In the final report, summarize what changed and why, list checks actually
   run, and link to the pull request. Do not claim tests or builds passed unless
   they were run successfully.

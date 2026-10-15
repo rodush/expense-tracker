@@ -34,113 +34,141 @@
   });
 
   function formatAmount(amount) {
-    return Number(amount).toFixed(2);
+    return new Intl.NumberFormat(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number(amount));
   }
 
   onDestroy(destroyCategoryChart);
 </script>
 
-<section id="dashboard" aria-labelledby="dashboardHeading">
-  <h2 id="dashboardHeading">Spending dashboard</h2>
-  <form id="filterForm" onsubmit={(event) => event.preventDefault()}>
-    <div class="grid">
-      <label for="categoryFilter">Categories
-        <select
-          bind:value={selectedCategories}
-          id="categoryFilter"
-          multiple
-          size="5"
-          aria-describedby="filterHelp"
-          onchange={onfilterschange}
-        >
-          {#each categoryOptions as category}
-            <option value={category}>{category}</option>
-          {/each}
-        </select>
-      </label>
-      <label for="whoFilter">Who
-        <select
-          bind:value={selectedPeople}
-          id="whoFilter"
-          multiple
-          size="5"
-          aria-describedby="filterHelp"
-          onchange={onfilterschange}
-        >
-          {#each whoOptions as person}
-            <option value={person}>{person}</option>
-          {/each}
-        </select>
-      </label>
+<section id="dashboard" class="dashboard" aria-labelledby="dashboardHeading" aria-busy={isLoading}>
+  <header class="section-heading">
+    <div>
+      <p class="eyebrow">Overview</p>
+      <h2 id="dashboardHeading">Spending overview</h2>
     </div>
-    <small id="filterHelp">Use Ctrl or Command while selecting multiple values.</small>
-    <button
-      id="clearFilters"
-      type="button"
-      class="secondary"
-      disabled={!selectedCategories.length && !selectedPeople.length}
-      onclick={onclearfilters}
-    >Clear filters</button>
-    <p id="activeFilters" aria-live="polite">
-      {activeFilters.length ? `Active filters: ${activeFilters.join(', ')}` : 'No filters active.'}
-    </p>
-  </form>
+    {#if isLoading}<span class="loading-note" role="status">Updating…</span>{/if}
+  </header>
 
-  {#if isLoading}<div id="dashboardLoading" role="status">Loading summary...</div>{/if}
-  {#if error}<div id="dashboardError" class="error" role="alert">{error}</div>{/if}
+  <section class="filter-card" aria-labelledby="filterHeading">
+    <div class="filter-card-heading">
+      <div>
+        <h3 id="filterHeading">Filter your expenses</h3>
+        <p>Choose one or more options to narrow this report.</p>
+      </div>
+      <button
+        id="clearFilters"
+        type="button"
+        class="clear-filter-button"
+        disabled={!selectedCategories.length && !selectedPeople.length}
+        onclick={onclearfilters}
+      >Clear filters</button>
+    </div>
+    <div id="filterForm" class="filter-groups">
+      <fieldset class="filter-group">
+        <legend>Category</legend>
+        <div class="filter-options">
+          {#each categoryOptions as category}
+            <label>
+              <input
+                bind:group={selectedCategories}
+                type="checkbox"
+                value={category}
+                onchange={onfilterschange}
+              />
+              {category}
+            </label>
+          {/each}
+        </div>
+      </fieldset>
+      <fieldset class="filter-group">
+        <legend>Person</legend>
+        <div class="filter-options">
+          {#each whoOptions as person}
+            <label>
+              <input
+                bind:group={selectedPeople}
+                type="checkbox"
+                value={person}
+                onchange={onfilterschange}
+              />
+              {person}
+            </label>
+          {/each}
+        </div>
+      </fieldset>
+    </div>
+    <p id="activeFilters" class="active-filters" aria-live="polite">
+      {activeFilters.length ? `Showing ${activeFilters.join(' · ')}` : 'Showing all expenses'}
+    </p>
+  </section>
+
+  {#if error}<p id="dashboardError" class="error-message" role="alert">{error}</p>{/if}
   {#if summary?.expense_count === 0}
-    <div id="dashboardEmpty" role="status">No expenses match the selected filters.</div>
+    <p id="dashboardEmpty" class="empty-state" role="status">
+      <strong>No expenses match these filters.</strong>
+      <span>Try choosing different options or clear the filters to see everything.</span>
+    </p>
   {/if}
   {#if summary}
-    <div id="dashboardContent">
-      <div class="dashboard-grid">
-        <article><strong>Total</strong><p id="totalAmount">{formatAmount(summary.total_amount)}</p></article>
-        <article><strong>Expenses</strong><p id="expenseCount">{summary.expense_count}</p></article>
+    <div id="dashboardContent" class="report-grid">
+      <section class="summary-cards" aria-label="Spending totals">
+        <article class="summary-card summary-card-primary">
+          <span class="metric-icon" aria-hidden="true">↗</span>
+          <p class="metric-label">Total spend</p>
+          <p id="totalAmount" class="metric-value">{formatAmount(summary.total_amount)}</p>
+        </article>
+        <article class="summary-card">
+          <span class="metric-icon metric-icon-muted" aria-hidden="true">#</span>
+          <p class="metric-label">Transactions</p>
+          <p id="expenseCount" class="metric-value">{summary.expense_count}</p>
+        </article>
+      </section>
+
+      <div class="breakdown-grid">
+        <section class="breakdown-card" aria-labelledby="categoryHeading">
+          <header class="breakdown-heading">
+            <div><p class="eyebrow">Where it goes</p><h3 id="categoryHeading">By category</h3></div>
+          </header>
+          <div class="chart-container">
+            <canvas
+              bind:this={categoryChartCanvas}
+              id="categoryChart"
+              aria-label="Doughnut chart showing spending by category"
+            ></canvas>
+          </div>
+          <div class="table-scroll">
+            <table id="categoryTable">
+              <caption>Spending totals by category</caption>
+              <thead><tr><th scope="col">Category</th><th scope="col">Amount</th><th scope="col">Count</th></tr></thead>
+              <tbody>
+                {#each summary.categories as item}
+                  <tr><th scope="row">{item.name}</th><td>{formatAmount(item.amount)}</td><td>{item.count}</td></tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="breakdown-card" aria-labelledby="personHeading">
+          <header class="breakdown-heading">
+            <div><p class="eyebrow">Who spent it</p><h3 id="personHeading">By person</h3></div>
+          </header>
+          <div class="table-scroll people-table-scroll">
+            <table id="whoTable">
+              <caption>Spending totals by person</caption>
+              <thead><tr><th scope="col">Person</th><th scope="col">Amount</th><th scope="col">Count</th></tr></thead>
+              <tbody>
+                {#each summary.who as item}
+                  <tr><th scope="row">{item.name}</th><td>{formatAmount(item.amount)}</td><td>{item.count}</td></tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
-      <article>
-        <header><strong>Spending by category</strong></header>
-        <div class="chart-container">
-          <canvas
-            bind:this={categoryChartCanvas}
-            id="categoryChart"
-            aria-label="Doughnut chart showing spending by category"
-          ></canvas>
-        </div>
-        <table id="categoryTable">
-          <caption>Category totals</caption>
-          <thead><tr><th>Category</th><th>Amount</th><th>Count</th></tr></thead>
-          <tbody>
-            {#each summary.categories as item}
-              <tr><td>{item.name}</td><td>{formatAmount(item.amount)}</td><td>{item.count}</td></tr>
-            {/each}
-          </tbody>
-        </table>
-      </article>
-      <article>
-        <header><strong>Spending by person</strong></header>
-        <table id="whoTable">
-          <caption>Person totals</caption>
-          <thead><tr><th>Person</th><th>Amount</th><th>Count</th></tr></thead>
-          <tbody>
-            {#each summary.who as item}
-              <tr><td>{item.name}</td><td>{formatAmount(item.amount)}</td><td>{item.count}</td></tr>
-            {/each}
-          </tbody>
-        </table>
-      </article>
     </div>
   {/if}
 </section>
-
-<style>
-  .dashboard-grid {
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  }
-
-  .chart-container {
-    height: 22rem;
-    position: relative;
-  }
-</style>
