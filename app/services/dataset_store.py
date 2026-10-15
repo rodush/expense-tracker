@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Protocol
 
 MONEY_QUANTUM = Decimal("0.01")
 DATASET_TTL_SECONDS = 60 * 60
@@ -54,6 +54,12 @@ class _StoredDataset:
 
 class DatasetNotFoundError(KeyError):
     """Raised when a dataset is missing or has expired."""
+
+
+class DatasetStoreBackend(Protocol):
+    def create(self, rows: Iterable[Mapping[str, Any]]) -> str: ...
+
+    def get(self, dataset_id: str) -> list[dict[str, Any]]: ...
 
 
 class DatasetStore:

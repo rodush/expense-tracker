@@ -5,6 +5,12 @@ from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
 
+from app.services.rule_engine import (
+    WhoRule,
+    parse_who_rules,
+    validate_category_configuration,
+)
+
 
 def _parse_categories(raw_value: str) -> tuple[str, ...]:
     raw_value = raw_value.strip()
@@ -30,10 +36,24 @@ class Settings:
     gemini_api_key: str | None = None
     log_level: str = "INFO"
     log_format: str = "json"
+    database_url: str = field(
+        default_factory=lambda: os.getenv(
+            "DATABASE_URL", "sqlite:///./expense-tracker.db"
+        )
+    )
     allowed_categories: tuple[str, ...] = field(
         default_factory=lambda: _parse_categories(
             os.getenv("CATEGORIES", "Food,Transport,Utilities,Shopping,Other")
         )
+    )
+    fallback_category: str = field(
+        default_factory=lambda: os.getenv("FALLBACK_CATEGORY", "Other").strip()
+    )
+    who_rules: tuple[WhoRule, ...] = field(
+        default_factory=lambda: parse_who_rules(os.getenv("WHO_RULES"))
+    )
+    unmatched_who: str = field(
+        default_factory=lambda: os.getenv("WHO_UNMATCHED_LABEL", "General").strip()
     )
 
     def __post_init__(self) -> None:
@@ -49,6 +69,11 @@ class Settings:
             raise ValueError("LOG_LEVEL must be a standard logging level")
         if self.log_format not in {"json", "text"}:
             raise ValueError("LOG_FORMAT must be either json or text")
+        if not self.database_url.strip():
+            raise ValueError("DATABASE_URL must not be empty")
+        validate_category_configuration(self.allowed_categories, self.fallback_category)
+        if not self.unmatched_who:
+            raise ValueError("WHO_UNMATCHED_LABEL must not be empty")
 
 
 settings = Settings()

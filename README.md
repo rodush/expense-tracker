@@ -191,8 +191,14 @@ For a server deployment, terminate TLS at the reverse proxy, pass secrets
 through the hosting platform's secret store rather than an image or committed
 file, and forward traffic only after `/ready` returns `200`. Set
 `LOG_FORMAT=json` for structured logs and configure `LOG_LEVEL` according to
-the platform's logging policy. The in-memory dataset store is temporary and
-is not safe to use as durable storage across restarts or multiple workers.
+the platform's logging policy. Set `DATABASE_URL` to a durable database and
+apply Alembic migrations before serving traffic. SQLite is the default for
+local and single-host deployments; see the database guide before choosing a
+multi-host deployment database.
+
+Database setup, migrations, production configuration, backup/restore, and
+current dataset/download retention behavior are documented in
+[`docs/database.md`](./docs/database.md).
 
 ## Environment variables
 
@@ -201,6 +207,10 @@ Create a `.env` file (`cp .env.example .env`) or export the following variables:
 ```bash
 export GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 export CATEGORIES=Food,Transport,Utilities,Shopping,Other
+export FALLBACK_CATEGORY=Other
+export WHO_RULES='[{"contains":"card ending 1234","who":"Alex"}]'
+export WHO_UNMATCHED_LABEL=General
+export DATABASE_URL=sqlite:///./expense-tracker.db
 export LOG_LEVEL=INFO
 export LOG_FORMAT=json
 ```
@@ -213,8 +223,23 @@ API keys or uploaded file contents.
 
 ## Category config
 
-The starter category list is read from the `CATEGORIES` environment variable.
-If the variable is not set, the app falls back to:
+Categories and deterministic `who` matching rules are deployment-level
+configuration for this milestone. Per-account settings management will build
+on the persisted configuration model after authentication is introduced.
+
+The category list is read from `CATEGORIES` and the fallback from
+`FALLBACK_CATEGORY`; the fallback must be one of the configured categories.
+`WHO_RULES` is a JSON array of literal, case-insensitive substring rules in
+first-match order. Each rule contains exactly `contains` and `who`, for example:
+
+```json
+[{"contains":"card ending 1234","who":"Alex"}]
+```
+
+Rules are bounded and validated at startup; regular expressions and executable
+expressions are not accepted. `WHO_UNMATCHED_LABEL` names transactions that
+match no rule. If no who rules are configured, existing Roman/Oksana matching
+defaults are retained.
 
 - Food
 - Transport
@@ -254,14 +279,9 @@ descriptions.
 
 ### Persistence and rollout notes
 
-The initial reporting dataset is intentionally short-lived and server-side. It
-is currently held in process memory for one hour, with a UUID-like identifier.
-This is suitable for the MVP only: process restarts, multiple workers, and
-cleanup failures must be treated as expected limitations, not as durable
-storage guarantees.
-
-Before production use, replace the temporary repository with a database-backed
-expense/session model. Define ownership or access control, retention and
-deletion, currency metadata, migrations, indexing, and cleanup jobs as part of
-that change. Keep the summary, preview, and export paths on the same normalized
-dataset boundary so persistence does not introduce reporting discrepancies.
+Datasets use the configured relational database and do not expire by default.
+Account ownership enforcement, user-visible retention/deletion, currency
+metadata, and automated cleanup remain future production work. See
+[`docs/database.md`](./docs/database.md) for setup, migrations, backup/restore,
+and current lifecycle boundaries. Summary, preview, and export continue to use
+the same normalized dataset boundary.

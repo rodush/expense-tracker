@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import logging
 import time
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -13,16 +15,18 @@ from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 
 from app.config import Settings, settings
+from app.db.session import create_session_factory
 from app.logging_config import configure_logging, request_id_context
 from app.routers import datasets, uploads, websocket
 from app.services import upload_service
+from app.services.database_dataset_store import DatabaseDatasetStore
 from app.services.dataset_service import DatasetService
-from app.services.dataset_store import DatasetStore, dataset_store
+from app.services.dataset_store import DatasetStoreBackend, dataset_store
 from app.services.errors import ServiceError
 from app.services.gemini_service import (
     categorize_dataframe_async,
-    determine_who_from_description,
 )
+from app.services.rule_engine import determine_who
 from app.services.upload_cache import ProcessedUploadCache, processed_upload_cache
 from app.services.upload_service import (
     Categorizer,
@@ -38,25 +42,83 @@ UI_TEMPLATE_FILE = Path(__file__).parent / "templates" / "index.html"
 
 def create_app(
     app_settings: Settings = settings,
-    data_store: DatasetStore = dataset_store,
+    data_store: DatasetStoreBackend | None = None,
     upload_cache: ProcessedUploadCache = processed_upload_cache,
-    categorizer: Categorizer = categorize_dataframe_async,
-    who_resolver: WhoResolver = determine_who_from_description,
+    categorizer: Categorizer | None = None,
+    who_resolver: WhoResolver | None = None,
     downloads_dir: Path = DOWNLOADS_DIR,
 ) -> FastAPI:
     """Build the API and its injectable application services."""
     configure_logging(app_settings.log_level, app_settings.log_format)
-    application = FastAPI(title="Expense Categorizer", version="0.1.0")
+
+    if categorizer is None:
+
+        async def configured_categorizer(
+            rows: list[dict[str, Any]],
+        ) -> list[dict[str, Any]]:
+            return await categorize_dataframe_async(
+                rows,
+                allowed_categories=app_settings.allowed_categories,
+                fallback_category=app_settings.fallback_category,
+                api_key=app_settings.gemini_api_key,
+            )
+
+        categorizer = configured_categorizer
+    if who_resolver is None:
+
+        def configured_who_resolver(description: str) -> str:
+            return determine_who(
+                description,
+                app_settings.who_rules,
+                app_settings.unmatched_who,
+            )
+
+        who_resolver = configured_who_resolver
+
+    @asynccontextmanager
+    async def lifespan(application: FastAPI):
+        engine, session_factory = create_session_factory(app_settings.database_url)
+        application.state.db_engine = engine
+        application.state.db_session_factory = session_factory
+        if data_store is None:
+            persistent_store = DatabaseDatasetStore(session_factory)
+            application.state.upload_service.dataset_store = persistent_store
+            application.state.dataset_service.dataset_store = persistent_store
+        else:
+            application.state.upload_service.dataset_store = data_store
+            application.state.dataset_service.dataset_store = data_store
+        try:
+            yield
+        finally:
+            engine.dispose()
+
+    application = FastAPI(
+        title="Expense Categorizer", version="0.1.0", lifespan=lifespan
+    )
     application.state.settings = app_settings
+    service_store = data_store if data_store is not None else dataset_store
+    cache_scope = json.dumps(
+        {
+            "categories": app_settings.allowed_categories,
+            "fallback_category": app_settings.fallback_category,
+            "who_rules": [
+                {"contains": rule.contains, "who": rule.who}
+                for rule in app_settings.who_rules
+            ],
+            "unmatched_who": app_settings.unmatched_who,
+        },
+        sort_keys=True,
+    )
     application.state.upload_service = UploadService(
-        dataset_store=data_store,
+        dataset_store=service_store,
         upload_cache=upload_cache,
         categorize=categorizer,
         determine_who=who_resolver,
         downloads_dir=downloads_dir,
+        cache_scope=cache_scope,
     )
     application.state.dataset_service = DatasetService(
-        dataset_store=data_store,
+        dataset_store=service_store,
         allowed_categories=app_settings.allowed_categories,
     )
     application.mount(
