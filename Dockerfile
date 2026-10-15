@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir uv \
     && uv sync --frozen --no-dev
 
 COPY app ./app
-COPY --from=frontend-build /workspace/app/static/frontend ./app/static/frontend
+COPY --from=frontend-build /workspace/app/static/frontend/ /app/app/static/frontend/
 COPY main.py ./
 
 EXPOSE 8000

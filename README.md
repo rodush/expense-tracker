@@ -2,9 +2,11 @@
 
 This project is a small FastAPI-based expense categorization app that reads uploaded CSV/XLS/XLSX files and assigns categories using a configurable category list with Gemini support.
 
-Repository contains frontend ([frontend](./frontend/)) and backen ([app](./apps)) parts and deployed as Docker container.
+The repository contains a Svelte frontend in [`frontend/`](./frontend/) and a
+FastAPI backend in [`app/`](./app/), deployed together as a Docker container.
 
-Github Actions workflows are used for agentic workflow.
+GitHub Actions run the frontend checks, Python checks, and Docker image build on
+pull requests.
 
 ## Reporting workflow
 
@@ -107,21 +109,6 @@ The build writes generated files to `app/static/frontend/`; they are ignored
 by Git. The Docker image builds them in a Node.js stage and copies them into
 the FastAPI image.
 
-The categorized expense preview is collapsed by default. Its Description
-column is last and constrained to about 300 pixels; hovering or focusing a
-description reveals its full text in a viewport-aware tooltip.
-
-The exact Chart.js dependency is pinned in `frontend/package.json`. To rebuild
-the checked-in browser asset after changing the dependency, run:
-
-```bash
-cd frontend
-npm ci
-npm run vendor:chartjs
-```
-
-The vendored library's license is included beside the asset.
-
 ## Amounts, empty results, and exports
 
 - Amounts are parsed as numeric values during upload. Positive values are
@@ -146,8 +133,8 @@ The vendored library's license is included beside the asset.
 ### Prerequisites
 
 In order to contribute to the project, you need to have the following ecosystem:
-- Python v3.14+ (soon will be 3.15)
-- Node.js 24 and npm
+- Python v3.14+
+- Node.js 24.15+ and npm
 - uv (Install as per your OS way)
 - git (Install as per your OS way)
 - github cli tool [gh](https://cli.github.com/)
@@ -157,15 +144,20 @@ In order to contribute to the project, you need to have the following ecosystem:
 ### Tech stack
 
 - Python + FastAPI for backend; (TODO: SqlAlchemy as ORM)
-- Svelte (not SvelteKit!) frontend library / framework + Vite for testing
+- Svelte 5+ (not SvelteKit) for the frontend, with Vite for building and the
+  frontend test/check tools declared in `frontend/package.json`
 - PicoCSS for styling
-- TODO: PostgreSQL as DB (persistance layer)
+- TODO: PostgreSQL as DB (persistence layer)
 
 ## Run locally
 
-In the project root directory run:
+Build the frontend, then start FastAPI from the repository root:
 
 ```bash
+cd frontend
+npm ci
+npm run build
+cd ..
 uv run fastapi dev
 ```
 
@@ -204,11 +196,11 @@ is not safe to use as durable storage across restarts or multiple workers.
 
 ## Environment variables
 
-Create a `.env` file (`cp .env.example .env`) or export the following variable:
+Create a `.env` file (`cp .env.example .env`) or export the following variables:
 
 ```bash
 export GEMINI_API_KEY=YOUR_GEMINI_API_KEY
-export CATEGORIES=Your categorie list, comma separated
+export CATEGORIES=Food,Transport,Utilities,Shopping,Other
 export LOG_LEVEL=INFO
 export LOG_FORMAT=json
 ```
@@ -237,6 +229,8 @@ In the project root directory run
 ```bash
 cd frontend
 npm ci
+npm test
+npm run check
 npm run build
 cd ..
 uv run pytest

@@ -1,6 +1,6 @@
---
-applyTo: .github/spec/archive/**/*.md
---
+---
+applyTo: .github/specs/archive/**/*.md
+---
 
 **Important notes**
 

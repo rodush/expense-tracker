@@ -35,14 +35,17 @@ export function createOrUpdateCategoryChart(canvas, items, categoryChartAmounts)
             },
           },
         },
-      });
-      return categoryChart;
-    }
+      },
+    });
+    return categoryChart;
+  }
 
   if (categoryChart) {
     categoryChart.data.labels = labels;
     categoryChart.data.datasets[0].data = values;
     categoryChart.data.datasets[0].backgroundColor = colors;
+    categoryChart.options.plugins.tooltip.callbacks.label = (context) =>
+      `${context.label}: ${formatAmount(categoryChartAmounts[context.dataIndex])}`;
     categoryChart.update();
   }
   return categoryChart;

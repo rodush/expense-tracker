@@ -148,13 +148,6 @@ def test_reuploading_identical_input_reuses_processed_data(
     assert client.get(f"/download/{second_payload['download_id']}").status_code == 200
 
 
-def test_preview_renderer_uses_text_nodes_for_uploaded_values() -> None:
-    app_js = Path("app/static/app.js").read_text(encoding="utf-8")
-
-    assert "cell.textContent = value ?? '';" in app_js
-    assert "tr.innerHTML" not in app_js
-
-
 def test_full_download_remains_available_as_the_categorized_csv() -> None:
     response = client.post(
         "/upload",

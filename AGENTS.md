@@ -1,134 +1,135 @@
----
-applyTo: "**"
----
+# Agent instructions
 
-# AGENTS.md
+These instructions apply to the whole repository. Keep changes focused, preserve
+the existing architecture, and follow the language-specific guidance below.
 
-## Sensitive instructions for AI coding agents
+## Project overview
 
-This repository is a Python-based project.
-Frontend for now is implemented as vanilla javascript with PicoCSS styling library.
-Treat all changes as production-adjacent and follow these rules strictly.
+This is a Python and Svelte project:
 
-### 1. Security and secrets
-- Never hardcode credentials, tokens, API keys, private endpoints, personal data, or secrets.
-- Do not commit `.env`, `.venv`, local secrets, or generated credentials.
-- If a sample configuration is needed, use placeholders like `YOUR_API_KEY` and clearly mark them as non-production.
-- Prefer environment variables or secure configuration loaders over inline secrets.
+- Python 3.14, `uv`, FastAPI, pandas, and Gemini integration implement the API
+  and expense processing.
+- Svelte 5+ with Vite implements the browser UI. FastAPI serves the page and
+  built frontend assets; it remains the API server. This is not a SvelteKit app
+  and does not run a separate frontend server in production.
+- Python source lives in `app/`; frontend source, npm manifests, and its lockfile
+  live in `frontend/`; tests live in `tests/` and `frontend/`.
+- Built frontend assets are generated under `app/static/frontend/` and served
+  through FastAPI's `/static` mount. Do not edit generated build output by hand.
 
-### 2. Dependency hygiene
-- Before adding a new Python package, confirm it is necessary and minimal.
-- Prefer well-maintained, widely used libraries with a clear security track record.
-- Do not downgrade dependencies or change lockfiles unless required by the task.
-- Keep dependency changes scoped to the request and document why they are needed.
+The README documents current API behavior and domain rules. Treat API contracts,
+financial calculations, and expense filtering rules as sensitive behavior: keep
+frontend expectations aligned with backend responses.
 
-### 3. Code safety and correctness
-- Preserve the existing architecture, style, and conventions unless the task explicitly requires refactoring.
-- Make the smallest safe change that solves the user’s request.
-- Do not introduce new runtime behavior without a corresponding test or justification.
-- Avoid unsafe filesystem writes, shell execution, or network calls outside the explicitly requested scope.
+## General safety and change discipline
 
-### 4. Python-specific guidance
-- Use Python v3.14.
-- Use uv as package manager.
-- Follow PEP 8 and existing project formatting standards.
-- Prefer type hints, clear docstrings, and readable naming where appropriate.
-- Avoid broad exception swallowing. Fail loudly and handle expected errors explicitly.
-- Use `pathlib`, `logging`, and standard library tooling where possible instead of ad hoc patterns.
-- Keep imports sorted and remove unused imports.
-- Create clean idiomatic Python code.
-- Avoid spaghetti-code, structure business logic into re-usable functions and modules.
+- Never add credentials, tokens, API keys, private endpoints, or personal data
+  to source, tests, logs, or committed configuration. Use environment variables
+  and placeholders for examples. Do not commit `.env`, virtual environments,
+  `node_modules`, or generated credentials.
+- Treat uploaded financial and personal data as sensitive. Do not log raw file
+  contents, descriptions, or secrets.
+- Make the smallest change that solves the task. Avoid unrelated cleanup,
+  broad rewrites, and new runtime behavior without tests or clear justification.
+- Do not add dependencies without confirming they are needed. For new or
+  upgraded dependencies, choose the newest stable version compatible with the
+  project at implementation time, check the library's current official docs,
+  update the appropriate lockfile, and explain any compatibility constraint.
+- Preserve dependency reproducibility. Do not install packages into or commit
+  root-level `node_modules`; npm manifests and lockfiles belong in `frontend/`.
+- Keep code modular and readable. Put API access, UI components, and reusable
+  behavior in appropriately scoped frontend modules rather than growing one
+  monolithic component.
 
-#### 4.1 FastAPI specific guidance
-- Use latest version of FastAPI (v0.141+) and features provided by that version.
-- Use advanced techniques when creating code: advanced custom types, proper response models, etc.
-- For external services (http clients) - as well as internal services - structure the code using Dependency Injection ("Depends()" from FastAPI) pattern, for the sake of easier testability and cleaner code structure.
+## Python and FastAPI
 
-### 5. Data handling
-- Treat all customer, financial, and personal data as sensitive.
-- Do not log raw secrets, access tokens, or PII.
-- Avoid writing temporary files into shared directories unless the task requires it.
+- Use Python 3.14 and `uv`. Follow PEP 8 and the repository's Ruff formatting.
+- Use type hints, clear names, `pathlib`, and standard-library facilities where
+  appropriate. Avoid broad exception swallowing and unused imports.
+- Use the latest stable FastAPI version compatible with the project and prefer
+  its current response models, dependency injection, and typing features.
+- Keep HTTP routing in `app/routers/`, business logic in `app/services/`, and
+  service access behind FastAPI dependencies. Preserve dependency injection so
+  tests can replace external services and stores.
+- Do not move business rules into the browser. The frontend should call the
+  existing API and render its responses.
+- Before changing an API contract, inspect its callers and tests, update the
+  relevant API documentation/specification, and add focused regression tests.
 
-### 6. Testing and validation
-- Follow TDD approach!
-- Run the relevant tests for any Python change when feasible.
-- When fixing an issue make sure the broken test is created first, and make sure it passes after the fix is implemented.
-- Do not claim tests pass unless they were actually run.
-- Do not create nonsense tests that verify obvious things and increase test coupling.
-- Run Python tests from the local directory where `pytest` is installed in the `.venv` with `uv`:
+### Python validation
 
-Run command while in the workspace directory (expense-tracker):
+Run commands from the repository root using `uv`:
 
 ```sh
 uv run pytest
-```
-
-- Do not run `uv` commands for JavaScript, HTML, or CSS-only changes. Python
-  validation is not a substitute for frontend validation.
-- For JavaScript, HTML, or CSS changes, use the frontend test command:
-
-```sh
-npm run test
-node --check app/static/app.js
-```
-
-- Frontend tests are not currently configured. Until they are added, it is
-  acceptable to skip `npm run test` for frontend-only changes and report that
-  no frontend test suite is available.
-- When a change spans Python and frontend code, run each applicable validation
-  command separately.
-
-### 7. Change discipline
-- Do not make unrelated cleanup changes.
-- Do not rewrite large sections of code without a clear reason.
-- If a request is ambiguous, choose the least risky interpretation and keep the diff focused.
-- Minimise usage of tokens. Generate as little code as needed to make the feature or test work.
-- Write code with the idea that you will maintain and work on this codebase in the future. Keep code clean and readable, easy to follow with the minimal token usage for future iterations.
-
-### 8. Final review checklist
-Before finishing, verify:
-- No secrets or sensitive data were introduced.
-- No unrelated files were modified.
-- The change is minimal, justified, and consistent with the repository’s Python conventions.
-- Any tests or validation steps actually performed are reported accurately.
-- Code quality tools are used (see [Development tools](#development-tools) section) and no errors found.
-
-## Python development tools
-
-The following tools apply only to Python code and enforce code style and type
-checking. Do not use them as validation for frontend-only changes.
-
-### Coding style
-
-We use [ruff](https://docs.astral.sh/ruff/) to ensure coding style consistency.
-
-Run it as:
-
-```sh
+uv run ruff format --check
 uv run ruff check
-```
-
-If any violations or errors found, try to autofix them with:
-
-```sh
-uv run ruff format
-```
-
-Afterwards, re-run check again. Make sure there are no coding style errors before committing and pushing the changes to remote.
-
-### Type Checking
-
-We use [ty](https://docs.astral.sh/ty/) to run static type analysis. Use it as:
-
-```sh
 uv run ty check
 ```
 
-Attempt to fix types accurately. Silencing the error should really be the last resort!
+For a focused Python change, run the relevant test target first, then the
+applicable Ruff and `ty` checks. Do not claim a check passed unless it ran.
 
-## Worktrees, focused commits, and pull requests
+## Frontend (the `frontend/` subproject)
 
-- Create an independent worktree and branch for each independent change, rather than combining unrelated work in one branch or pull request.
-- Keep each pull request small and focused on one change; split independent fixes, features, or documentation updates into separate pull requests.
-- After relevant validation passes, review the complete diff, commit the focused changes using the repository's commit convention, push the branch, and create a pull request with a concise summary and validation results. This is the default delivery workflow and standing user authorization; do not wait for a separate request to commit, push, or open the PR.
-- Do not report work as delivered until it is committed and its pull request has been created. Skip publication only when the user explicitly opts out or when a concrete blocker prevents safe delivery; explain the blocker rather than silently stopping.
+- `frontend/package.json` and `frontend/package-lock.json` are the sole npm
+  manifest and lockfile. Run npm commands from `frontend/`.
+- Use Node.js 24.15 or newer for frontend development and CI.
+- Use Svelte 5 or newer and current stable Vite/Svelte tooling compatible with
+  the project's Node version. Use Svelte 5 runes (`$state`, `$derived`,
+  `$effect`, and `$props`) for new reactive component code. Do not introduce
+  legacy `$:` reactive declarations in new code; migrate legacy code touched by
+  a change when it is practical and in scope.
+- Keep state in Svelte components or Svelte-native state abstractions. Avoid
+  mutable plain-JavaScript module globals as a substitute for reactive state.
+- Use small `.svelte` components for cohesive UI areas and plain `.js` modules
+  for API clients or framework-independent utilities. Do not add SvelteKit or a
+  client-side router unless a task specifically requires one.
+- Keep frontend code accessible and safe: use semantic HTML, preserve keyboard
+  interaction, render uploaded values as text, and never inject untrusted HTML.
+- FastAPI serves compiled files from `app/static/frontend/`; Vite's production
+  output must target this directory. Docker must copy that output into the
+  Python runtime image. Keep generated output out of version control.
+
+### Frontend development and validation
+
+Run from `frontend/`:
+
+```sh
+npm ci
+npm test
+npm run check
+npm run build
+```
+
+Keep these scripts defined in `frontend/package.json`. Write or update a
+focused frontend test before changing behavior (TDD), then run it, Svelte
+diagnostics/type checks, and the production build. Add the same checks to CI.
+If a command cannot run because of an environment limitation, report that
+clearly and do not imply it passed. Do not use `uv` to validate frontend-only
+changes.
+
+For changes that touch both stacks, run the relevant Python and frontend
+validation separately, and build the Docker image when packaging or static
+asset paths change.
+
+## Security and secrets
+
+- Never hardcode credentials, tokens, API keys, private endpoints, or personal
+  data. Use environment variables or a secure runtime configuration source.
+- Treat uploaded files and their content as untrusted. Validate them on the
+  server, escape/render their values safely, and avoid logging their contents.
+- Do not add unsafe filesystem writes, shell execution, or network calls outside
+  the task's scope.
+
+## Agent workflow and delivery
+
+- Work on a focused branch/worktree for each independent change. Preserve
+  pre-existing user changes and inspect the complete diff before delivery.
+- After relevant validation passes, commit focused changes using the repository
+  commit convention, push the branch, and open a concise pull request. This is
+  standing authorization. If publication is blocked, report the concrete
+  blocker rather than claiming delivery.
+- In the final report, summarize what changed and why, list checks actually
+  run, and link to the pull request. Do not claim tests or builds passed unless
+  they were run successfully.
