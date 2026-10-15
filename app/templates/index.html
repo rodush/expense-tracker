@@ -6,54 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Expenses Categorizer</title>
   <link rel="stylesheet" href="/static/pico/css/pico.green.min.css">
+  <link rel="stylesheet" href="/static/frontend/app.css">
   <link rel="icon" href="/static/images/favicon.ico" />
-  <style type="text/css">
-    .hidden {
-      display: none;
-    }
-
-    .dashboard-grid {
-      display: grid;
-      gap: 1rem;
-      grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    }
-
-    .chart-container {
-      height: 22rem;
-      position: relative;
-    }
-
-    #resultsTable {
-      table-layout: fixed;
-      width: 100%;
-    }
-
-    #resultsTable col.description-column {
-      width: 300px;
-    }
-
-    #resultsTable .description-cell {
-      max-width: 300px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .description-tooltip {
-      background: var(--pico-color);
-      border-radius: var(--pico-border-radius);
-      color: var(--pico-background-color);
-      max-width: min(24rem, calc(100vw - 1.5rem));
-      max-height: calc(100vh - 1rem);
-      overflow-wrap: anywhere;
-      overflow-y: auto;
-      padding: 0.5rem 0.75rem;
-      pointer-events: none;
-      position: fixed;
-      white-space: normal;
-      z-index: 1000;
-    }
-  </style>
 </head>
 
 <body>
@@ -73,100 +27,9 @@
 
 
   </header>
-  <main class="container">
-    <div class="panel">
-      <p>Upload a CSV, XLS, or XLSX expense file to categorize descriptions with Gemini.</p>
-      <input id="fileInput" type="file" accept=".csv,.xls,.xlsx" aria-errormessage="error" />
-      <button id="uploadButton">Upload & Categorize</button>
-      <div id="loading" class="hidden">Processing...</div>
-      <div id="error" class="error hidden"></div>
-    </div>
-
-    <article>
-      <h2>Preview</h2>
-      <details>
-        <summary>Categorized expenses (preview)</summary>
-        <table id="resultsTable">
-          <colgroup>
-            <col>
-            <col>
-            <col>
-            <col>
-            <col class="description-column">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Amount</th>
-              <th>Who</th>
-              <th>Category</th>
-              <th>Description</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </details>
-      <p>
-        <a id="downloadLink" class="hidden">Download full categorized CSV</a>
-        <a id="filteredDownloadLink" class="hidden">Download current filtered CSV</a>
-      </p>
-    </article>
-
-    <section id="dashboard" class="hidden" aria-labelledby="dashboardHeading">
-      <h2 id="dashboardHeading">Spending dashboard</h2>
-      <form id="filterForm">
-        <div class="grid">
-          <label for="categoryFilter">Categories
-            <select id="categoryFilter" multiple size="5" disabled
-              aria-describedby="filterHelp"></select>
-          </label>
-          <label for="whoFilter">Who
-            <select id="whoFilter" multiple size="5" disabled
-              aria-describedby="filterHelp"></select>
-          </label>
-        </div>
-        <small id="filterHelp">Use Ctrl or Command while selecting multiple values.</small>
-        <button id="clearFilters" type="button" class="secondary" disabled>Clear filters</button>
-        <p id="activeFilters" aria-live="polite">No filters active.</p>
-      </form>
-
-      <div id="dashboardLoading" class="hidden" role="status">Loading summary...</div>
-      <div id="dashboardError" class="error hidden" role="alert"></div>
-      <div id="dashboardEmpty" class="hidden" role="status">
-        No expenses match the selected filters.
-      </div>
-      <div id="dashboardContent">
-        <div class="dashboard-grid">
-          <article><strong>Total</strong><p id="totalAmount">—</p></article>
-          <article><strong>Expenses</strong><p id="expenseCount">—</p></article>
-        </div>
-        <article>
-          <header><strong>Spending by category</strong></header>
-          <div class="chart-container">
-            <canvas id="categoryChart" role="img"
-              aria-label="Doughnut chart showing spending by category"></canvas>
-          </div>
-          <table id="categoryTable">
-            <caption>Category totals</caption>
-            <thead><tr><th>Category</th><th>Amount</th><th>Count</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </article>
-        <article>
-          <header><strong>Spending by person</strong></header>
-          <table id="whoTable">
-            <caption>Person totals</caption>
-            <thead><tr><th>Person</th><th>Amount</th><th>Count</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </article>
-      </div>
-    </section>
-  </main>
-  <div id="descriptionTooltip" class="description-tooltip" role="tooltip" hidden></div>
+  <div id="app"></div>
   <footer class="container"><em>Experimenting with Python and FastAPI &dash; &copy; 2026</em></footer>
-  <script src="/static/vendor/chart.umd.min.js"></script>
-  <script src="/static/app.js"></script>
+  <script type="module" src="/static/frontend/app.js"></script>
 </body>
 
 </html>

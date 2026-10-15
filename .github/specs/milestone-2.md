@@ -1,3 +1,12 @@
+# Milestone 2: reporting API and dashboard
+
+> **Status: implemented.** This file preserves the original planning notes and
+> implementation proposal. References to the pre-reporting vanilla JavaScript
+> frontend describe the project at planning time. For the current stack,
+> frontend workflow, and implemented behavior, follow `AGENTS.md`, `README.md`,
+> source code, and tests. The reporting contract and domain rules in this plan
+> remain useful context where they agree with those current sources.
+
 Created isolated worktree for branch `agents/expense-visualization-plan-filtering`
 
 I’ll first map the existing frontend, backend, data model, and test structure, then I’ll turn that into an implementation plan with a visualization-library recommendation.

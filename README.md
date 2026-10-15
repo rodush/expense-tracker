@@ -1,22 +1,24 @@
-# Expense Categorizer MVP
+# Expense Categorizer
 
 This project is a small FastAPI-based expense categorization app that reads uploaded CSV/XLS/XLSX files and assigns categories using a configurable category list with Gemini support.
+
+The repository contains a Svelte frontend in [`frontend/`](./frontend/) and a
+FastAPI backend in [`app/`](./app/), deployed together as a Docker container.
+
+GitHub Actions run the frontend checks, Python checks, and Docker image build on
+pull requests.
 
 ## Reporting workflow
 
 The reporting workflow is designed as:
 
 1. **Upload**: the browser sends an expense file to `POST /upload`. The file
-   must contain `date`, `amount`, and `description` columns. ABN AMRO headers
-   `Transactiedatum`, `Transactiebedrag`, and `Omschrijving` are mapped to those
-   English field names during processing. The service normalizes column names,
-   excludes rows with positive amounts (card credits) and SEPA transfers to
+   must contain `date`, `amount`, and `description` columns. ABN AMRO headers `Transactiedatum`, `Transactiebedrag`, and `Omschrijving` are mapped to those English field names during processing.
+   
+   The service normalizes column names, excludes rows with positive amounts (card credits) and SEPA transfers to
    `Savings Account` before categorization, converts retained debit amounts to
-   absolute values, derives `who`, assigns a configured category, and returns a
-   preview. The response's `row_count`,
-   preview, dataset, and downloads contain only the retained rows. Identical
-   input bytes and file types reuse processed rows from a one-hour in-memory
-   cache, avoiding repeat categorization.
+   absolute values, derives `who`, assigns a configured category, and returns a preview. The response's `row_count`, preview, dataset, and downloads contain only the retained rows.
+   Identical input bytes and file types reuse processed rows from a one-hour in-memory cache, avoiding repeat categorization.
 2. **Dataset**: the response includes a short-lived `dataset_id` for the
    normalized rows. The dataset is the shared source for the preview,
    summaries, and exports; it is not a second copy with different parsing
@@ -79,29 +81,33 @@ and [`.github/specs/milestone-2.md`](.github/specs/milestone-2.md). If the API
 implementation requires a field change, update those documents and this
 section together.
 
-## Dashboard charts
+## Frontend application
 
-The dashboard renders category totals as a Chart.js 4.5.1 doughnut chart,
-loaded from the locally served `/static/vendor/chart.umd.min.js` asset. This
-keeps charts available without a third-party CDN at runtime. The chart updates
-with the selected filters and assigns a distinct color to each unique category
-in the summary response, including categories with no matching expenses.
-Tooltips and tables show the signed net amounts.
+The dynamic upload, preview, filtering, download, and dashboard UI is
+implemented in Svelte with Vite. This is a client-side component application,
+not a SvelteKit application: FastAPI continues to serve the page, APIs, and
+compiled assets under `/static/frontend/`. Chart.js is bundled locally, so the
+browser does not load frontend code from a third-party CDN.
 
-The categorized expense preview is collapsed by default. Its Description
-column is last and constrained to about 300 pixels; hovering or focusing a
-description reveals its full text in a viewport-aware tooltip.
+The category doughnut chart updates with the selected filters and assigns a
+distinct color to each category in the summary response. The categorized
+expense preview is collapsed by default. Its Description column is last and
+constrained to about 300 pixels; hovering or focusing a description reveals
+its full text in a viewport-aware tooltip.
 
-The exact Chart.js dependency is pinned in `frontend/package.json`. To rebuild
-the checked-in browser asset after changing the dependency, run:
+To build assets for local development:
 
 ```bash
 cd frontend
 npm ci
-npm run vendor:chartjs
+npm run build
+cd ..
+uv run uvicorn app.main:app --reload
 ```
 
-The vendored library's license is included beside the asset.
+The build writes generated files to `app/static/frontend/`; they are ignored
+by Git. The Docker image builds them in a Node.js stage and copies them into
+the FastAPI image.
 
 ## Amounts, empty results, and exports
 
@@ -127,18 +133,32 @@ The vendored library's license is included beside the asset.
 ### Prerequisites
 
 In order to contribute to the project, you need to have the following ecosystem:
-- Python v3.14+ (soon will be 3.15)
+- Python v3.14+
+- Node.js 24.15+ and npm
 - uv (Install as per your OS way)
 - git (Install as per your OS way)
 - github cli tool [gh](https://cli.github.com/)
 - [trufflehog](https://github.com/trufflesecurity/trufflehog)
 - [Github Agentic Workflows](https://github.com/github/gh-aw) extension
 
+### Tech stack
+
+- Python + FastAPI for backend; (TODO: SqlAlchemy as ORM)
+- Svelte 5+ (not SvelteKit) for the frontend, with Vite for building and the
+  frontend test/check tools declared in `frontend/package.json`
+- PicoCSS for styling
+- TODO: PostgreSQL as DB (persistence layer)
+
 ## Run locally
 
+Build the frontend, then start FastAPI from the repository root:
+
 ```bash
-cd /home/rodush/Work/expense-tracker
-/home/rodush/.local/bin/uv run uvicorn app.main:app --reload
+cd frontend
+npm ci
+npm run build
+cd ..
+uv run fastapi dev
 ```
 
 Then open:
@@ -160,8 +180,9 @@ docker run --rm -p 8000:8000 \
   expense-categorizer
 ```
 
-The image uses the locked dependencies from `uv.lock`, does not enable
-Uvicorn's development reload mode, and includes a Docker health check. Use
+The image builds the frontend with the locked npm dependencies and uses the
+locked Python dependencies from `uv.lock`. It does not enable Uvicorn's
+development reload mode and includes a Docker health check. Use
 `GET /health` for liveness and `GET /ready` for readiness monitoring. Both
 endpoints are local-runtime checks and do not replace an external load balancer
 or process supervisor.
@@ -175,7 +196,7 @@ is not safe to use as durable storage across restarts or multiple workers.
 
 ## Environment variables
 
-Create a `.env` file or export the following variable:
+Create a `.env` file (`cp .env.example .env`) or export the following variables:
 
 ```bash
 export GEMINI_API_KEY=YOUR_GEMINI_API_KEY
@@ -192,7 +213,8 @@ API keys or uploaded file contents.
 
 ## Category config
 
-The starter category list is read from the `CATEGORIES` environment variable. If the variable is not set, the app falls back to:
+The starter category list is read from the `CATEGORIES` environment variable.
+If the variable is not set, the app falls back to:
 
 - Food
 - Transport
@@ -202,8 +224,15 @@ The starter category list is read from the `CATEGORIES` environment variable. If
 
 ## Testing
 
+In the project root directory run
+
 ```bash
-cd /home/rodush/Work/expense-tracker
+cd frontend
+npm ci
+npm test
+npm run check
+npm run build
+cd ..
 uv run pytest
 uv run ruff format --check
 uv run ruff check
@@ -211,17 +240,19 @@ uv run ty check
 ```
 
 CI runs the formatting, lint, and test commands for every pull request and for
-pushes to `main`. The test suite does not require a Gemini API key; external
+pushes to `master` branch. The test suite does not require a Gemini API key; external
 categorization is covered with deterministic fallbacks and mocks.
 
 The release gate also includes API contract tests
 for category-only, person-only, combined, multi-value, invalid-filter,
 unknown-dataset, malformed-amount, negative-amount, and empty-result cases.
-When dashboard controls are added, manually verify upload initialization,
-filter reset, loading/error/empty states, chart/table/download consistency,
-and safe text rendering of uploaded descriptions.
+Manually verify upload initialization, filter reset, loading/error/empty
+states, chart/table/download consistency, and safe text rendering of uploaded
+descriptions.
 
-## Persistence and rollout notes
+## TODO
+
+### Persistence and rollout notes
 
 The initial reporting dataset is intentionally short-lived and server-side. It
 is currently held in process memory for one hour, with a UUID-like identifier.

@@ -4,4 +4,5 @@ __pycache__/
 .venv/
 .tmp
 .worktrees/
-frontend/node_modules/
+node_modules/
+app/static/frontend/

@@ -1,10 +1,26 @@
 {
-  "name": "expense-categorizer-frontend-assets",
+  "name": "expense-categorizer-frontend",
   "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.15.0"
+  },
   "scripts": {
-    "vendor:chartjs": "node scripts/vendor-chartjs.mjs"
+    "build": "vite build",
+    "check": "svelte-check --tsconfig ./jsconfig.json",
+    "test": "vitest run"
   },
   "dependencies": {
-    "chart.js": "4.5.1"
+    "chart.js": "4.5.1",
+    "svelte": "5.57.2"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@testing-library/svelte": "5.4.2",
+    "jsdom": "30.1.2",
+    "svelte-check": "4.7.6",
+    "typescript": "6.0.3",
+    "vite": "8.3.4",
+    "vitest": "5.0.4"
   }
 }
