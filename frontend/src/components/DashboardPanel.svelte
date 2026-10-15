@@ -8,12 +8,14 @@
     selectedCategories = $bindable([]),
     selectedPeople = $bindable([]),
     summary,
-    isLoading,
-    error,
-    onfilterschange,
     onclearfilters,
   } = $props();
   let categoryChartCanvas = $state();
+  let categorySort = $state({ key: 'amount', direction: 'desc' });
+  let whoSort = $state({ key: 'amount', direction: 'desc' });
+
+  const sortedCategories = $derived(sortItems(summary?.categories ?? [], categorySort));
+  const sortedPeople = $derived(sortItems(summary?.who ?? [], whoSort));
 
   const activeFilters = $derived([
     ...selectedCategories.map((value) => `category: ${value}`),
@@ -40,16 +42,31 @@
     }).format(Number(amount));
   }
 
+  function sortItems(items, sort) {
+    return [...items].sort((left, right) => {
+      const a = left[sort.key];
+      const b = right[sort.key];
+      const comparison = typeof a === 'number' && typeof b === 'number'
+        ? a - b
+        : String(a ?? '').localeCompare(String(b ?? ''), undefined, { numeric: true });
+      return comparison * (sort.direction === 'asc' ? 1 : -1);
+    });
+  }
+
+  function toggleSort(state, key) {
+    state = { key, direction: state.key === key && state.direction === 'asc' ? 'desc' : 'asc' };
+    return state;
+  }
+
   onDestroy(destroyCategoryChart);
 </script>
 
-<section id="dashboard" class="dashboard" aria-labelledby="dashboardHeading" aria-busy={isLoading}>
+<section id="dashboard" class="dashboard" aria-labelledby="dashboardHeading">
   <header class="section-heading">
     <div>
       <p class="eyebrow">Overview</p>
       <h2 id="dashboardHeading">Spending overview</h2>
     </div>
-    {#if isLoading}<span class="loading-note" role="status">Updating…</span>{/if}
   </header>
 
   <section class="filter-card" aria-labelledby="filterHeading">
@@ -76,7 +93,6 @@
                 bind:group={selectedCategories}
                 type="checkbox"
                 value={category}
-                onchange={onfilterschange}
               />
               {category}
             </label>
@@ -92,7 +108,6 @@
                 bind:group={selectedPeople}
                 type="checkbox"
                 value={person}
-                onchange={onfilterschange}
               />
               {person}
             </label>
@@ -105,7 +120,6 @@
     </p>
   </section>
 
-  {#if error}<p id="dashboardError" class="error-message" role="alert">{error}</p>{/if}
   {#if summary?.expense_count === 0}
     <p id="dashboardEmpty" class="empty-state" role="status">
       <strong>No expenses match these filters.</strong>
@@ -139,17 +153,24 @@
               aria-label="Doughnut chart showing spending by category"
             ></canvas>
           </div>
+          <details class="category-totals">
+            <summary>Spending totals by category</summary>
           <div class="table-scroll">
             <table id="categoryTable">
-              <caption>Spending totals by category</caption>
-              <thead><tr><th scope="col">Category</th><th scope="col">Amount</th><th scope="col">Count</th></tr></thead>
+              <caption class="visually-hidden">Spending totals by category</caption>
+              <thead><tr>
+                {#each [['name', 'Category'], ['amount', 'Amount'], ['count', 'Count']] as [key, label]}
+                  <th scope="col"><button class="sort-button" aria-label={`Sort by ${label}`} onclick={() => { categorySort = toggleSort(categorySort, key); }}>{label} <span aria-hidden="true">{categorySort.key === key ? (categorySort.direction === 'asc' ? '↑' : '↓') : '↕'}</span></button></th>
+                {/each}
+              </tr></thead>
               <tbody>
-                {#each summary.categories as item}
+                {#each sortedCategories as item}
                   <tr><th scope="row">{item.name}</th><td>{formatAmount(item.amount)}</td><td>{item.count}</td></tr>
                 {/each}
               </tbody>
             </table>
           </div>
+          </details>
         </section>
 
         <section class="breakdown-card" aria-labelledby="personHeading">
@@ -159,9 +180,13 @@
           <div class="table-scroll people-table-scroll">
             <table id="whoTable">
               <caption>Spending totals by person</caption>
-              <thead><tr><th scope="col">Person</th><th scope="col">Amount</th><th scope="col">Count</th></tr></thead>
+              <thead><tr>
+                {#each [['name', 'Person'], ['amount', 'Amount'], ['count', 'Count']] as [key, label]}
+                  <th scope="col"><button class="sort-button" aria-label={`Sort by ${label}`} onclick={() => { whoSort = toggleSort(whoSort, key); }}>{label} <span aria-hidden="true">{whoSort.key === key ? (whoSort.direction === 'asc' ? '↑' : '↓') : '↕'}</span></button></th>
+                {/each}
+              </tr></thead>
               <tbody>
-                {#each summary.who as item}
+                {#each sortedPeople as item}
                   <tr><th scope="row">{item.name}</th><td>{formatAmount(item.amount)}</td><td>{item.count}</td></tr>
                 {/each}
               </tbody>

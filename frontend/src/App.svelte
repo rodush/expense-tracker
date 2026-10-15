@@ -1,6 +1,5 @@
 <script>
-  import { onDestroy } from 'svelte';
-  import { fetchSummary, uploadFile, buildExportUrl } from './api';
+  import { uploadFile, buildExportUrl } from './api';
   import DashboardPanel from './components/DashboardPanel.svelte';
   import PreviewPanel from './components/PreviewPanel.svelte';
   import UploadPanel from './components/UploadPanel.svelte';
@@ -14,11 +13,6 @@
   let whoOptions = $state([]);
   let selectedCategories = $state([]);
   let selectedPeople = $state([]);
-  let summary = $state(null);
-  let isDashboardLoading = $state(false);
-  let dashboardError = $state('');
-  let summaryController;
-
   const filteredRows = $derived(previewRows.filter((row) =>
     (!selectedCategories.length || selectedCategories.includes(row.category))
     && (!selectedPeople.length || selectedPeople.includes(row.who))
@@ -26,6 +20,30 @@
   const filteredDownloadUrl = $derived(datasetId
     ? buildExportUrl(datasetId, selectedCategories, selectedPeople)
     : '');
+  const summary = $derived.by(() => {
+    const totalCents = filteredRows.reduce((sum, row) => sum + Math.round(Number(row.amount ?? 0) * 100), 0);
+    const aggregate = (field) => {
+      const groups = new Map();
+      for (const row of filteredRows) {
+        const name = String(row[field] ?? '');
+        const group = groups.get(name) ?? { name, cents: 0, count: 0 };
+        group.cents += Math.round(Number(row.amount ?? 0) * 100);
+        group.count += 1;
+        groups.set(name, group);
+      }
+      return [...groups.values()].map(({ name, cents, count }) => ({ name, amount: cents / 100, count }));
+    };
+    const categories = aggregate('category').map((item) => ({
+      ...item,
+      percentage: totalCents ? Math.round(item.amount * 10000 / totalCents) / 100 : 0,
+    }));
+    return {
+      expense_count: filteredRows.length,
+      total_amount: totalCents / 100,
+      categories,
+      who: aggregate('who'),
+    };
+  });
 
   async function handleUpload(file) {
     if (!file) {
@@ -46,8 +64,6 @@
       whoOptions = [...new Set(previewRows.map((row) => row.who).filter(Boolean))].sort();
       selectedCategories = [];
       selectedPeople = [];
-      summary = null;
-      await loadSummary(payload.dataset_id, [], []);
     } catch (err) {
       uploadError = err instanceof Error ? err.message : 'Something went wrong.';
     } finally {
@@ -55,43 +71,10 @@
     }
   }
 
-  async function loadSummary(
-    targetDatasetId = datasetId,
-    categories = selectedCategories,
-    people = selectedPeople,
-  ) {
-    if (!targetDatasetId) return;
-    summaryController?.abort();
-    const requestController = new AbortController();
-    summaryController = requestController;
-    isDashboardLoading = true;
-    dashboardError = '';
-
-    try {
-      const payload = await fetchSummary(
-        targetDatasetId,
-        categories,
-        people,
-        requestController.signal,
-      );
-      if (requestController.signal.aborted) return;
-      summary = payload;
-    } catch (err) {
-      if (err instanceof Error && err.name !== 'AbortError') {
-        dashboardError = err.message;
-      }
-    } finally {
-      if (!requestController.signal.aborted) isDashboardLoading = false;
-    }
-  }
-
   function clearFilters() {
     selectedCategories = [];
     selectedPeople = [];
-    loadSummary();
   }
-
-  onDestroy(() => summaryController?.abort());
 </script>
 
 <main class="container app-shell">
@@ -137,9 +120,6 @@
         bind:selectedCategories
         bind:selectedPeople
         {summary}
-        isLoading={isDashboardLoading}
-        error={dashboardError}
-        onfilterschange={() => loadSummary()}
         onclearfilters={clearFilters}
       />
       <PreviewPanel
