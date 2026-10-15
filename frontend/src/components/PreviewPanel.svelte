@@ -30,107 +30,90 @@
     if (event.currentTarget.contains(event.relatedTarget)) return;
     if (tooltip.rowIndex === index) tooltip.rowIndex = null;
   }
+
+  function formatAmount(amount) {
+    return new Intl.NumberFormat(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number(amount));
+  }
 </script>
 
-<article>
-  <h2>Preview</h2>
-  <details>
-    <summary>Categorized expenses (preview)</summary>
-    <table id="resultsTable">
-      <colgroup>
-        <col />
-        <col />
-        <col />
-        <col />
-        <col class="description-column" />
-      </colgroup>
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Amount</th>
-          <th>Who</th>
-          <th>Category</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each rows as row, index}
-          <tr>
-            <td>{row.date ?? ''}</td>
-            <td>{row.amount ?? ''}</td>
-            <td>{row.who ?? ''}</td>
-            <td>{row.category ?? ''}</td>
-            <td
-              class="description-cell"
-              tabindex="0"
-              aria-describedby={tooltip.rowIndex === index ? 'descriptionTooltip' : undefined}
-              onmouseover={(event) => showTooltip(index, row.description, event.clientX, event.clientY)}
-              onmousemove={(event) => {
-                if (tooltip.rowIndex === index) positionTooltip(event.clientX, event.clientY);
-              }}
-              onmouseout={(event) => hideTooltip(event, index)}
-              onfocus={(event) => {
-                const bounds = event.currentTarget.getBoundingClientRect();
-                showTooltip(
-                  index,
-                  row.description,
-                  bounds.left + bounds.width / 2,
-                  bounds.top + bounds.height / 2,
-                );
-              }}
-              onblur={(event) => hideTooltip(event, index)}
-            >{row.description ?? ''}</td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-  </details>
-  <p>
-    {#if downloadId}
-      <a id="downloadLink" href={`/download/${encodeURIComponent(downloadId)}`}>
-        Download full categorized CSV
-      </a>
-    {/if}
+<section class="transactions" aria-labelledby="transactionsHeading">
+  <header class="section-heading transactions-heading">
+    <div>
+      <p class="eyebrow">Transaction detail</p>
+      <h2 id="transactionsHeading">Recent expenses</h2>
+    </div>
+    <span class="row-count">{rows.length} {rows.length === 1 ? 'expense' : 'expenses'}</span>
+  </header>
+  <nav class="download-actions" aria-label="Export expenses">
     {#if datasetId}
-      <a id="filteredDownloadLink" href={filteredDownloadUrl}>
-        Download current filtered CSV
+      <a id="filteredDownloadLink" class="download-primary" href={filteredDownloadUrl}>
+        Download filtered CSV <span aria-hidden="true">↓</span>
       </a>
     {/if}
-  </p>
-</article>
-
-<style>
-  #resultsTable {
-    table-layout: fixed;
-    width: 100%;
-  }
-
-  #resultsTable col.description-column {
-    width: 300px;
-  }
-
-  #resultsTable .description-cell {
-    max-width: 300px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .description-tooltip {
-    background: var(--pico-color);
-    border-radius: var(--pico-border-radius);
-    color: var(--pico-background-color);
-    max-width: min(24rem, calc(100vw - 1.5rem));
-    max-height: calc(100vh - 1rem);
-    overflow-wrap: anywhere;
-    overflow-y: auto;
-    padding: 0.5rem 0.75rem;
-    pointer-events: none;
-    position: fixed;
-    white-space: normal;
-    z-index: 1000;
-  }
-</style>
+    {#if downloadId}
+      <a id="downloadLink" class="download-secondary" href={`/download/${encodeURIComponent(downloadId)}`}>
+        Download full statement
+      </a>
+    {/if}
+  </nav>
+  <details class="transaction-details">
+    <summary><span>Review transactions</span><span class="summary-count">{rows.length} rows</span></summary>
+    <div class="table-scroll">
+      <table id="resultsTable">
+        <caption>Expenses included in the current report</caption>
+        <colgroup>
+          <col />
+          <col />
+          <col />
+          <col />
+          <col class="description-column" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Amount</th>
+            <th scope="col">Person</th>
+            <th scope="col">Category</th>
+            <th scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each rows as row, index}
+            <tr>
+              <td>{row.date ?? ''}</td>
+              <td>{formatAmount(row.amount ?? 0)}</td>
+              <td>{row.who ?? ''}</td>
+              <td>{row.category ?? ''}</td>
+              <td
+                class="description-cell"
+                tabindex="0"
+                aria-describedby={tooltip.rowIndex === index ? 'descriptionTooltip' : undefined}
+                onmouseover={(event) => showTooltip(index, row.description, event.clientX, event.clientY)}
+                onmousemove={(event) => {
+                  if (tooltip.rowIndex === index) positionTooltip(event.clientX, event.clientY);
+                }}
+                onmouseout={(event) => hideTooltip(event, index)}
+                onfocus={(event) => {
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  showTooltip(
+                    index,
+                    row.description,
+                    bounds.left + bounds.width / 2,
+                    bounds.top + bounds.height / 2,
+                  );
+                }}
+                onblur={(event) => hideTooltip(event, index)}
+              >{row.description ?? ''}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>
 
 {#if tooltip.rowIndex !== null}
   <div

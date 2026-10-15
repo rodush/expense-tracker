@@ -21,6 +21,16 @@ afterEach(() => {
 });
 
 describe('expense dashboard', () => {
+  it('guides first-time users through the statement upload', () => {
+    render(App);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Make sense of your spending.' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Upload an expense statement' })).toBeTruthy();
+    expect(screen.getByText('CSV, XLS, or XLSX · up to 5 MB')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Spending overview' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Recent expenses' })).toBeNull();
+  });
+
   it('renders uploaded descriptions as text and sends categories to the chart', async () => {
     uploadFile.mockResolvedValue({
       dataset_id: 'dataset-1',
@@ -44,9 +54,12 @@ describe('expense dashboard', () => {
     await fireEvent.change(container.querySelector('#fileInput'), {
       target: { files: [new File(['data'], 'expenses.csv', { type: 'text/csv' })] },
     });
-    await fireEvent.click(screen.getByRole('button', { name: 'Upload & Categorize' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Analyze expenses' }));
 
     expect(await screen.findByText('<img src=x onerror=alert(1)>')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Spending overview' })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'Food' })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'Ava' })).toBeTruthy();
     expect(container.querySelector('#resultsTable img')).toBeNull();
     await waitFor(() => expect(createOrUpdateCategoryChart).toHaveBeenCalledWith(
       expect.any(HTMLCanvasElement),

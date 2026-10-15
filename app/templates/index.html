@@ -4,31 +4,34 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Expenses Categorizer</title>
+  <meta name="theme-color" content="#f4f7f4" />
+  <meta name="description" content="Understand your spending with a clear expense overview." />
+  <title>Expense tracker · Spending insights</title>
   <link rel="stylesheet" href="/static/pico/css/pico.green.min.css">
   <link rel="stylesheet" href="/static/frontend/app.css">
   <link rel="icon" href="/static/images/favicon.ico" />
 </head>
 
 <body>
-  <header class="container">
-    <nav>
-      <ul>
-        <li><img src="/static/images/expense-tracker-logo.png" width="100rem" preload="true" /></li>
-        <li>
-          <h1 style="display: inline-block;" class="inline">Expenses Categorizer - MVP</h1>
-        </li>
-      </ul>
-      <ul>
-        <li><a href="/about.html">About</a></li>
-        <li><a href="/">Home</a></li>
-      </ul>
+  <header class="site-header">
+    <nav class="container" aria-label="Main navigation">
+      <a class="brand-link" href="/" aria-label="Expense tracker home">
+        <img src="/static/images/expense-tracker-logo.png" width="48" height="48" alt="" />
+        <span>
+          <span class="brand-name">Expense tracker</span>
+          <span class="brand-tagline">A clearer view of your spending</span>
+        </span>
+      </a>
+      <span class="header-note">Simple spending insights</span>
     </nav>
-
-
   </header>
   <div id="app"></div>
-  <footer class="container"><em>Experimenting with Python and FastAPI &dash; &copy; 2026</em></footer>
+  <footer class="site-footer">
+    <div class="container site-footer-inner">
+      <span>Expense tracker</span>
+      <span>Built with Python, FastAPI, and Svelte</span>
+    </div>
+  </footer>
   <script type="module" src="/static/frontend/app.js"></script>
 </body>
 
