@@ -6,7 +6,11 @@ from decimal import Decimal
 from io import StringIO
 from typing import Any
 
-from app.services.dataset_store import DatasetNotFoundError, DatasetStore, parse_amount
+from app.services.dataset_store import (
+    DatasetNotFoundError,
+    DatasetStoreBackend,
+    parse_amount,
+)
 from app.services.errors import ServiceError
 
 logger = logging.getLogger("expense_tracker")
@@ -14,7 +18,7 @@ logger = logging.getLogger("expense_tracker")
 
 class DatasetService:
     def __init__(
-        self, dataset_store: DatasetStore, allowed_categories: tuple[str, ...]
+        self, dataset_store: DatasetStoreBackend, allowed_categories: tuple[str, ...]
     ) -> None:
         self.dataset_store = dataset_store
         self.allowed_categories = allowed_categories

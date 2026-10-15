@@ -15,3 +15,4 @@ This directory contains GitHub-issue-ready specifications for hardening the expe
 9. Safe rendering and export behavior — [18-downloads-and-safe-rendering.md](18-downloads-and-safe-rendering.md)
 10. Regression testing and QA — [19-regression-testing-and-qa.md](19-regression-testing-and-qa.md)
 11. Documentation and rollout — [20-documentation-and-rollout.md](20-documentation-and-rollout.md)
+12. Persistent storage and configurable expense rules — [milestone-4.md](milestone-4.md)

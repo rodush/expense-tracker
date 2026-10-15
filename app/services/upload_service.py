@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import uuid
 from collections.abc import Awaitable, Callable
 from decimal import Decimal
 from io import BytesIO
@@ -10,8 +9,14 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from sqlalchemy.exc import SQLAlchemyError
 
-from app.services.dataset_store import DatasetStore, normalize_rows, parse_amount
+from app.services.dataset_store import (
+    DatasetNotFoundError,
+    DatasetStoreBackend,
+    normalize_rows,
+    parse_amount,
+)
 from app.services.errors import ServiceError
 from app.services.upload_cache import ProcessedUploadCache
 
@@ -61,17 +66,19 @@ def _load_spreadsheet(raw_content: bytes, file_extension: str) -> pd.DataFrame:
 class UploadService:
     def __init__(
         self,
-        dataset_store: DatasetStore,
+        dataset_store: DatasetStoreBackend,
         upload_cache: ProcessedUploadCache,
         categorize: Categorizer,
         determine_who: WhoResolver,
         downloads_dir: Path,
+        cache_scope: str = "",
     ) -> None:
         self.dataset_store = dataset_store
         self.upload_cache = upload_cache
         self.categorize = categorize
         self.determine_who = determine_who
         self.downloads_dir = downloads_dir
+        self.cache_scope = cache_scope
 
     async def process_upload(
         self, filename: str | None, raw_content: bytes
@@ -96,7 +103,11 @@ class UploadService:
             raise ServiceError(413, "Uploaded file is too large.")
 
         cache_key = hashlib.sha256(
-            file_extension.encode("ascii") + b"\0" + raw_content
+            self.cache_scope.encode("utf-8")
+            + b"\0"
+            + file_extension.encode("ascii")
+            + b"\0"
+            + raw_content
         ).hexdigest()
         cached_upload = self.upload_cache.get(cache_key)
         if cached_upload is not None:
@@ -113,12 +124,15 @@ class UploadService:
                 normalized_dataset_rows,
             ) = await self._process_new_upload(filename, raw_content, file_extension)
 
-        download_id = str(uuid.uuid4())
-        output_path = self.downloads_dir / f"categorized_{download_id}.csv"
+        download_id = ""
+        output_path = self.downloads_dir / "categorized.csv"
         try:
-            self.downloads_dir.mkdir(parents=True, exist_ok=True)
-            dataframe.to_csv(output_path, index=False)
             dataset_id = self.dataset_store.create(normalized_dataset_rows)
+            download_id = dataset_id
+            output_path = self.downloads_dir / f"categorized_{download_id}.csv"
+            if not getattr(self.dataset_store, "supports_download_regeneration", False):
+                self.downloads_dir.mkdir(parents=True, exist_ok=True)
+                dataframe.to_csv(output_path, index=False)
             if cached_upload is None:
                 self.upload_cache.put(
                     cache_key,
@@ -135,7 +149,7 @@ class UploadService:
                 503,
                 "The categorized file could not be saved. Please retry the upload.",
             ) from exc
-        except (RuntimeError, ValueError) as exc:
+        except (RuntimeError, ValueError, SQLAlchemyError) as exc:
             logger.exception(
                 "Failed to store categorized upload",
                 extra={"file_name": filename, "download_id": download_id},
@@ -233,10 +247,31 @@ class UploadService:
 
     def download_path(self, download_id: str) -> Path:
         output_path = self.downloads_dir / f"categorized_{download_id}.csv"
+        rows = None
+        can_regenerate = getattr(
+            self.dataset_store, "supports_download_regeneration", False
+        )
+        if can_regenerate:
+            try:
+                rows = self.dataset_store.get(download_id)
+            except DatasetNotFoundError as exc:
+                logger.warning(
+                    "download.not_found",
+                    extra={"operation": "download", "download_id": download_id},
+                )
+                raise ServiceError(404, "Categorized file not found.") from exc
         if not output_path.exists():
-            logger.warning(
-                "download.not_found",
-                extra={"operation": "download", "download_id": download_id},
-            )
-            raise ServiceError(404, "Categorized file not found.")
+            if not can_regenerate:
+                logger.warning(
+                    "download.not_found",
+                    extra={"operation": "download", "download_id": download_id},
+                )
+                raise ServiceError(404, "Categorized file not found.")
+            try:
+                self.downloads_dir.mkdir(parents=True, exist_ok=True)
+                pd.DataFrame(rows or []).to_csv(output_path, index=False)
+            except OSError as exc:
+                raise ServiceError(
+                    503, "The categorized file could not be regenerated."
+                ) from exc
         return output_path
