@@ -5,6 +5,19 @@
   let { rows, downloadId, datasetId, filteredDownloadUrl } = $props();
   let tooltipElement = $state();
   let tooltip = $state({ text: '', rowIndex: null, left: 0, top: 0 });
+  let sort = $state({ key: 'date', direction: 'desc' });
+  const sortedRows = $derived([...rows].sort((left, right) => {
+    const a = left[sort.key];
+    const b = right[sort.key];
+    const comparison = sort.key === 'amount'
+      ? Number(a ?? 0) - Number(b ?? 0)
+      : String(a ?? '').localeCompare(String(b ?? ''), undefined, { numeric: true });
+    return comparison * (sort.direction === 'asc' ? 1 : -1);
+  }));
+
+  function toggleSort(key) {
+    sort = { key, direction: sort.key === key && sort.direction === 'asc' ? 'desc' : 'asc' };
+  }
 
   async function showTooltip(index, description, x, y) {
     tooltip.rowIndex = index;
@@ -73,15 +86,13 @@
         </colgroup>
         <thead>
           <tr>
-            <th scope="col">Date</th>
-            <th scope="col">Amount</th>
-            <th scope="col">Person</th>
-            <th scope="col">Category</th>
-            <th scope="col">Description</th>
+          {#each [['date', 'Date'], ['amount', 'Amount'], ['who', 'Person'], ['category', 'Category'], ['description', 'Description']] as [key, label]}
+            <th scope="col"><button class="sort-button" aria-label={`Sort by ${label}`} onclick={() => toggleSort(key)}>{label} <span aria-hidden="true">{sort.key === key ? (sort.direction === 'asc' ? '↑' : '↓') : '↕'}</span></button></th>
+          {/each}
           </tr>
         </thead>
         <tbody>
-          {#each rows as row, index}
+          {#each sortedRows as row, index}
             <tr>
               <td>{row.date ?? ''}</td>
               <td>{formatAmount(row.amount ?? 0)}</td>

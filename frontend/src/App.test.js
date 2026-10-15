@@ -31,7 +31,7 @@ describe('expense dashboard', () => {
     expect(screen.queryByRole('heading', { name: 'Recent expenses' })).toBeNull();
   });
 
-  it('renders uploaded descriptions as text and sends categories to the chart', async () => {
+  it('filters locally, renders descriptions as text, and summarizes the filtered rows', async () => {
     uploadFile.mockResolvedValue({
       dataset_id: 'dataset-1',
       download_id: 'download-1',
@@ -41,13 +41,9 @@ describe('expense dashboard', () => {
         who: 'Ava',
         category: 'Food',
         description: '<img src=x onerror=alert(1)>',
+      }, {
+        date: '2026-01-02', amount: 20, who: 'Mia', category: 'Travel', description: 'Train',
       }],
-    });
-    fetchSummary.mockResolvedValue({
-      expense_count: 1,
-      total_amount: 12,
-      categories: [{ name: 'Food', amount: 12, count: 1 }],
-      who: [{ name: 'Ava', amount: 12, count: 1 }],
     });
     const { container } = render(App);
 
@@ -63,8 +59,20 @@ describe('expense dashboard', () => {
     expect(container.querySelector('#resultsTable img')).toBeNull();
     await waitFor(() => expect(createOrUpdateCategoryChart).toHaveBeenCalledWith(
       expect.any(HTMLCanvasElement),
-      [{ name: 'Food', amount: 12, count: 1 }],
-      [12],
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'Food', amount: 12, count: 1 }),
+        expect.objectContaining({ name: 'Travel', amount: 20, count: 1 }),
+      ]),
+      expect.arrayContaining([12, 20]),
     ));
+    expect(screen.getByText('32.00')).toBeTruthy();
+    expect(fetchSummary).not.toHaveBeenCalled();
+
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'Food' }));
+    expect(container.querySelector('#totalAmount').textContent).toBe('12.00');
+    expect(screen.queryByText('Train')).toBeNull();
+    expect(fetchSummary).not.toHaveBeenCalled();
+    expect(screen.getByText('Spending totals by category', { selector: 'summary' })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /Sort by/ }).length).toBeGreaterThan(5);
   });
 });

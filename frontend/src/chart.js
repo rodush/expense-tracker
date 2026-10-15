@@ -24,7 +24,7 @@ export function createOrUpdateCategoryChart(canvas, items, categoryChartAmounts)
       },
       options: {
         cutout: '62%',
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         responsive: true,
         plugins: {
           legend: { position: 'bottom' },
