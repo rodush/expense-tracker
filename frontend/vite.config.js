@@ -14,6 +14,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.js'],
+    pool: 'vmThreads',
   },
   build: {
     outDir: resolve(frontendDirectory, '../app/static/frontend'),
