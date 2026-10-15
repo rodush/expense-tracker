@@ -249,7 +249,9 @@ def test_ui_route_serves_the_browser_page() -> None:
     assert "Expenses Categorizer" in response.text
     assert '<div id="app"></div>' in response.text
     assert '<link rel="stylesheet" href="/static/frontend/app.css">' in response.text
-    assert '<script type="module" src="/static/frontend/app.js"></script>' in response.text
+    assert (
+        '<script type="module" src="/static/frontend/app.js"></script>' in response.text
+    )
 
 
 def test_upload_returns_downloadable_csv_file() -> None:
