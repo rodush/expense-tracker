@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import time
 import uuid
@@ -21,13 +20,13 @@ from app.routers import datasets, uploads, websocket
 from app.services import upload_service
 from app.services.database_dataset_store import DatabaseDatasetStore
 from app.services.dataset_service import DatasetService
-from app.services.dataset_store import DatasetStoreBackend, dataset_store
+from app.services.dataset_store import LedgerStoreBackend
 from app.services.errors import ServiceError
+from app.services.expense_history_service import ExpenseHistoryService
 from app.services.gemini_service import (
     categorize_dataframe_async,
 )
 from app.services.rule_engine import determine_who
-from app.services.upload_cache import ProcessedUploadCache, processed_upload_cache
 from app.services.upload_service import (
     Categorizer,
     UploadService,
@@ -42,8 +41,7 @@ UI_TEMPLATE_FILE = Path(__file__).parent / "templates" / "index.html"
 
 def create_app(
     app_settings: Settings = settings,
-    data_store: DatasetStoreBackend | None = None,
-    upload_cache: ProcessedUploadCache = processed_upload_cache,
+    data_store: LedgerStoreBackend | None = None,
     categorizer: Categorizer | None = None,
     who_resolver: WhoResolver | None = None,
     downloads_dir: Path = DOWNLOADS_DIR,
@@ -75,52 +73,39 @@ def create_app(
 
         who_resolver = configured_who_resolver
 
-    @asynccontextmanager
-    async def lifespan(application: FastAPI):
+    engine = None
+    session_factory = None
+    if data_store is None:
         engine, session_factory = create_session_factory(app_settings.database_url)
-        application.state.db_engine = engine
-        application.state.db_session_factory = session_factory
-        if data_store is None:
-            persistent_store = DatabaseDatasetStore(session_factory)
-            application.state.upload_service.dataset_store = persistent_store
-            application.state.dataset_service.dataset_store = persistent_store
-        else:
-            application.state.upload_service.dataset_store = data_store
-            application.state.dataset_service.dataset_store = data_store
+        service_store = DatabaseDatasetStore(session_factory)
+    else:
+        service_store = data_store
+
+    @asynccontextmanager
+    async def lifespan(_application: FastAPI):
         try:
             yield
         finally:
-            engine.dispose()
+            if engine is not None:
+                engine.dispose()
 
     application = FastAPI(
         title="Expense Categorizer", version="0.1.0", lifespan=lifespan
     )
     application.state.settings = app_settings
-    service_store = data_store if data_store is not None else dataset_store
-    cache_scope = json.dumps(
-        {
-            "categories": app_settings.allowed_categories,
-            "fallback_category": app_settings.fallback_category,
-            "who_rules": [
-                {"contains": rule.contains, "who": rule.who}
-                for rule in app_settings.who_rules
-            ],
-            "unmatched_who": app_settings.unmatched_who,
-        },
-        sort_keys=True,
-    )
+    application.state.db_engine = engine
+    application.state.db_session_factory = session_factory
     application.state.upload_service = UploadService(
         dataset_store=service_store,
-        upload_cache=upload_cache,
         categorize=categorizer,
         determine_who=who_resolver,
         downloads_dir=downloads_dir,
-        cache_scope=cache_scope,
     )
     application.state.dataset_service = DatasetService(
         dataset_store=service_store,
         allowed_categories=app_settings.allowed_categories,
     )
+    application.state.expense_history_service = ExpenseHistoryService(service_store)
     application.mount(
         "/static",
         StaticFiles(directory=Path(__file__).parent / "static"),

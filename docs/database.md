@@ -8,12 +8,22 @@ relational database. Keep database URLs and credentials in environment
 variables or the deployment platform's secret store; never commit credentials
 to `.env`, source, or container images.
 
-The upload and reporting APIs use the configured database for datasets and
-ordered expense rows. Dataset ownership is nullable in preparation for
-authentication in Milestone 5. Category and `who` rules are currently
-deployment-level configuration; the schema also reserves rule-set tables for
-later account-scoped configuration. Dataset records do not expire by default
-and are shared by app instances using the same database.
+The upload and history APIs use the configured database for import batches and
+canonical expense records. An import batch describes an uploaded statement;
+its newly recognized rows become durable ledger entries. Expense records are
+queried across all batches and do not expire. Dataset ownership is nullable in
+preparation for authentication in Milestone 5. Category and `who` rules are
+deployment-level configuration in this milestone; the schema reserves rule-set
+tables for later account-scoped configuration. App instances using the same
+database share the same expense history.
+
+Exact file re-uploads are short-circuited by a persisted SHA-256 file hash.
+Overlapping exports are deduplicated by a key built from normalized bank
+fields, with an occurrence number preserving identical rows inside one import.
+Because the current export contract provides no stable bank transaction ID,
+two truly identical purchases cannot always be distinguished across different
+files. If the bank supplies a stable reference, use it as the record key in a
+future schema revision.
 
 ## Local development
 
@@ -114,29 +124,27 @@ Back up before schema changes; after restore, verify connectivity, migration
 revision, and a representative read before routing traffic. Keep recovery
 credentials separate from normal application credentials.
 
-## Dataset retention and generated downloads
+## Expense retention and generated downloads
 
-Persistent datasets are durable records, not entries in the old one-hour
-in-memory store. They have no expiry by default. The schema has an optional
-`expires_at` field, but a deletion API and scheduled database cleanup are not
-currently provided. Until an explicit retention/deletion feature is shipped,
-datasets must be treated as retained indefinitely and can be removed only
-through a controlled database maintenance procedure that also removes
-dependent expense rows. Database backups can retain deleted records until
-those backups expire; include this in any deletion policy.
+Expense history is persistent and has no expiration field or cleanup job.
+There is no user-visible deletion API in this milestone. Treat financial
+records as retained indefinitely; any manual removal should be a controlled
+database maintenance action that also removes associated import metadata.
+Database backups can retain deleted records until those backups expire; include
+this in any deletion policy.
 
-Categorized CSV downloads can be regenerated from persisted rows after a
-restart or local file loss. Generated files are cached under the configured
-downloads directory (by default `.tmp` under the process working directory).
+Per-import categorized CSV downloads can be regenerated from persisted rows
+after a restart or local file loss. Generated files are stored under the
+configured downloads directory (by default `.tmp` under the process working directory).
 The current implementation does not provide a generated-file expiration or
 cleanup job. For deployments, place this directory on appropriately protected
 storage, account for it in disk monitoring and backup/deletion procedures, and
 remove stale exports with controlled operational cleanup. Do not assume
-deleting a dataset also deletes an already generated CSV. Future automated
+deleting an import batch also deletes an already generated CSV. Future automated
 retention must define dataset and export lifetimes together, remove exports
 safely, and avoid deleting files that are still being served.
 
 These limits must be revisited before public production use: define a user
-visible retention policy, authenticated dataset deletion, an auditable cleanup
+visible retention policy, authenticated expense deletion, an auditable cleanup
 job, and export expiry/cleanup behavior before treating persisted financial
 data as production-ready.

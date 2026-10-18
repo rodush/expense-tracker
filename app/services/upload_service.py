@@ -13,12 +13,12 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.dataset_store import (
     DatasetNotFoundError,
-    DatasetStoreBackend,
+    LedgerStoreBackend,
     normalize_rows,
     parse_amount,
 )
 from app.services.errors import ServiceError
-from app.services.upload_cache import ProcessedUploadCache
+from app.services.transaction_identity import normalize_transaction_date, record_keys
 
 logger = logging.getLogger("expense_tracker")
 
@@ -66,19 +66,15 @@ def _load_spreadsheet(raw_content: bytes, file_extension: str) -> pd.DataFrame:
 class UploadService:
     def __init__(
         self,
-        dataset_store: DatasetStoreBackend,
-        upload_cache: ProcessedUploadCache,
+        dataset_store: LedgerStoreBackend,
         categorize: Categorizer,
         determine_who: WhoResolver,
         downloads_dir: Path,
-        cache_scope: str = "",
     ) -> None:
         self.dataset_store = dataset_store
-        self.upload_cache = upload_cache
         self.categorize = categorize
         self.determine_who = determine_who
         self.downloads_dir = downloads_dir
-        self.cache_scope = cache_scope
 
     async def process_upload(
         self, filename: str | None, raw_content: bytes
@@ -102,43 +98,81 @@ class UploadService:
         if len(raw_content) > MAX_UPLOAD_SIZE_BYTES:
             raise ServiceError(413, "Uploaded file is too large.")
 
-        cache_key = hashlib.sha256(
-            self.cache_scope.encode("utf-8")
-            + b"\0"
-            + file_extension.encode("ascii")
-            + b"\0"
-            + raw_content
-        ).hexdigest()
-        cached_upload = self.upload_cache.get(cache_key)
-        if cached_upload is not None:
-            dataframe = pd.DataFrame(
-                cached_upload.rows, columns=list(cached_upload.columns)
-            )
-            category_column_added = cached_upload.category_column_added
-            normalized_dataset_rows = normalize_rows(cached_upload.rows)
-            logger.info("upload.cache_hit", extra={"operation": "upload_cache"})
-        else:
+        source_hash = hashlib.sha256(raw_content).hexdigest()
+        try:
+            existing_import = self.dataset_store.find_import(source_hash)
+        except SQLAlchemyError as exc:
+            raise ServiceError(
+                503, "The expense ledger is temporarily unavailable."
+            ) from exc
+        if existing_import is not None:
+            rows = existing_import["rows"]
+            return {
+                "row_count": existing_import["row_count"],
+                "new_transaction_count": 0,
+                "duplicate_count": existing_import["row_count"],
+                "category_column_added": existing_import["category_column_added"],
+                "columns": existing_import["columns"],
+                "preview": rows,
+                "download_id": existing_import["dataset_id"],
+                "dataset_id": existing_import["dataset_id"],
+            }
+
+        (
+            dataframe,
+            category_column_added,
+            normalized_rows,
+        ) = await self._process_new_upload(filename, raw_content, file_extension)
+        keys = record_keys(normalized_rows)
+        try:
+            known_keys = self.dataset_store.existing_record_keys(keys)
+        except SQLAlchemyError as exc:
+            raise ServiceError(
+                503, "The expense ledger is temporarily unavailable."
+            ) from exc
+        new_rows = [
+            (key, row)
+            for key, row in zip(keys, normalized_rows, strict=True)
+            if key not in known_keys
+        ]
+        new_rows = [
             (
-                dataframe,
-                category_column_added,
-                normalized_dataset_rows,
-            ) = await self._process_new_upload(filename, raw_content, file_extension)
+                key,
+                {
+                    **row,
+                    "who": self.determine_who(str(row.get("description", "") or "")),
+                },
+            )
+            for key, row in new_rows
+        ]
+        categorized_rows = (
+            await self.categorize([row for _, row in new_rows]) if new_rows else []
+        )
+        if len(categorized_rows) != len(new_rows):
+            raise ServiceError(
+                502, "Expense categorization returned an invalid result."
+            )
+        rows_to_import = [
+            (key, {**row, **categorized})
+            for (key, row), categorized in zip(new_rows, categorized_rows, strict=True)
+        ]
 
         download_id = ""
         output_path = self.downloads_dir / "categorized.csv"
         try:
-            dataset_id = self.dataset_store.create(normalized_dataset_rows)
+            dataset_id, inserted_rows, duplicate_count = self.dataset_store.import_rows(
+                source_hash=source_hash,
+                row_count=len(normalized_rows),
+                rows=rows_to_import,
+                columns=list(dataframe.columns),
+                category_column_added=category_column_added,
+            )
             download_id = dataset_id
             output_path = self.downloads_dir / f"categorized_{download_id}.csv"
             if not getattr(self.dataset_store, "supports_download_regeneration", False):
                 self.downloads_dir.mkdir(parents=True, exist_ok=True)
-                dataframe.to_csv(output_path, index=False)
-            if cached_upload is None:
-                self.upload_cache.put(
-                    cache_key,
-                    dataframe.to_dict(orient="records"),
-                    dataframe.columns,
-                    category_column_added,
+                pd.DataFrame(inserted_rows, columns=list(dataframe.columns)).to_csv(
+                    output_path, index=False
                 )
         except OSError as exc:
             logger.exception(
@@ -163,16 +197,18 @@ class UploadService:
             "Upload processed successfully",
             extra={
                 "file_name": filename,
-                "rows": len(dataframe),
+                "rows": len(normalized_rows),
+                "new_transaction_count": len(inserted_rows),
+                "duplicate_count": duplicate_count,
                 "download_id": download_id,
                 "dataset_id": dataset_id,
             },
         )
-        preview = dataframe.sort_values(
-            "amount", ascending=True, kind="stable"
-        ).to_dict(orient="records")
+        preview = sorted(inserted_rows, key=lambda row: float(row.get("amount", 0)))
         return {
-            "row_count": len(dataframe),
+            "row_count": len(normalized_rows),
+            "new_transaction_count": len(inserted_rows),
+            "duplicate_count": duplicate_count,
             "category_column_added": category_column_added,
             "columns": list(dataframe.columns),
             "preview": preview,
@@ -204,10 +240,12 @@ class UploadService:
             )
 
         try:
+            dataframe["date"] = dataframe["date"].map(normalize_transaction_date)
             parsed_amounts = dataframe["amount"].map(parse_amount)
         except (TypeError, ValueError) as exc:
             logger.warning(
-                "Upload contains an invalid amount", extra={"file_name": filename}
+                "Upload contains an invalid transaction field",
+                extra={"file_name": filename},
             )
             raise ServiceError(400, str(exc)) from exc
 
@@ -218,10 +256,7 @@ class UploadService:
         expense_rows = ~(credit_rows | savings_transfer_rows)
         dataframe = dataframe.loc[expense_rows].copy()
         dataframe["amount"] = parsed_amounts.loc[expense_rows].abs().astype(float)
-        dataframe["who"] = (
-            dataframe["description"].fillna("").astype(str).apply(self.determine_who)
-        )
-
+        dataframe["who"] = ""
         category_column_added = "category" not in dataframe.columns
         if category_column_added:
             dataframe["category"] = "Other"
@@ -230,14 +265,8 @@ class UploadService:
             {str(key): value for key, value in row.items()}
             for row in dataframe.to_dict(orient="records")
         ]
-        categorized_rows = await self.categorize(normalized_rows)
-        dataframe = dataframe.assign(
-            category=[row["category"] for row in categorized_rows]
-        )
         try:
-            normalized_dataset_rows = normalize_rows(
-                dataframe.to_dict(orient="records")
-            )
+            normalized_dataset_rows = normalize_rows(normalized_rows)
         except (TypeError, ValueError) as exc:
             logger.warning(
                 "Upload contains an invalid amount", extra={"file_name": filename}

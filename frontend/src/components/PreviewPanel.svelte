@@ -2,7 +2,7 @@
   import { tick } from 'svelte';
   import { calculateTooltipPosition } from '../tooltip-position';
 
-  let { rows, downloadId, datasetId, filteredDownloadUrl } = $props();
+  let { rows, filteredDownloadUrl, totalCount = 0, offset = 0, limit = 25, loading = false, onprevious, onnext } = $props();
   let tooltipElement = $state();
   let tooltip = $state({ text: '', rowIndex: null, left: 0, top: 0 });
   let sort = $state({ key: 'date', direction: 'desc' });
@@ -56,24 +56,22 @@
   <header class="section-heading transactions-heading">
     <div>
       <p class="eyebrow">Transaction detail</p>
-      <h2 id="transactionsHeading">Recent expenses</h2>
+      <h2 id="transactionsHeading">Expense history</h2>
     </div>
-    <span class="row-count">{rows.length} {rows.length === 1 ? 'expense' : 'expenses'}</span>
+    <span class="row-count">{totalCount} {totalCount === 1 ? 'expense' : 'expenses'}</span>
   </header>
   <nav class="download-actions" aria-label="Export expenses">
-    {#if datasetId}
-      <a id="filteredDownloadLink" class="download-primary" href={filteredDownloadUrl}>
-        Download filtered CSV <span aria-hidden="true">↓</span>
-      </a>
-    {/if}
-    {#if downloadId}
-      <a id="downloadLink" class="download-secondary" href={`/download/${encodeURIComponent(downloadId)}`}>
-        Download full statement
-      </a>
-    {/if}
+    <a id="filteredDownloadLink" class="download-primary" href={filteredDownloadUrl}>
+      Download filtered CSV <span aria-hidden="true">↓</span>
+    </a>
   </nav>
-  <details class="transaction-details">
-    <summary><span>Review transactions</span><span class="summary-count">{rows.length} rows</span></summary>
+  {#if loading}
+    <p class="empty-state" role="status">Loading saved expenses…</p>
+  {:else if totalCount === 0}
+    <p class="empty-state" role="status">No saved expenses match these filters.</p>
+  {:else}
+  <details class="transaction-details" open>
+    <summary><span>Review transactions</span><span class="summary-count">{rows.length} of {totalCount} rows</span></summary>
     <div class="table-scroll">
       <table id="resultsTable">
         <caption>Expenses included in the current report</caption>
@@ -124,6 +122,12 @@
       </table>
     </div>
   </details>
+  <nav class="history-pagination" aria-label="Expense history pages">
+    <button type="button" class="clear-filter-button" onclick={onprevious} disabled={offset === 0}>Previous</button>
+    <span>Showing {offset + 1}–{Math.min(offset + limit, totalCount)} of {totalCount}</span>
+    <button type="button" class="clear-filter-button" aria-label="Next page" onclick={onnext} disabled={offset + limit >= totalCount}>Next page</button>
+  </nav>
+  {/if}
 </section>
 
 {#if tooltip.rowIndex !== null}

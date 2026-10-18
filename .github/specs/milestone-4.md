@@ -1,33 +1,46 @@
-# Milestone 4: persistent storage and configurable expense rules
+# Milestone 4: persistent expense ledger and configurable rules
 
 ## Goal
 
-Replace process-local dataset storage with durable database-backed storage using
-an ORM, and let each account configure the expense categories and person
-identification rules used during upload and reporting. This milestone prepares
-the data model for multiple users; account authentication and ownership
-enforcement are delivered in Milestone 5.
+Turn monthly ABN AMRO transaction exports into a durable, searchable expense
+ledger. Store each processed expense independently of the file it came from,
+avoid categorizing or storing the same transaction twice when exports overlap,
+and let the user review historical expenses. This milestone prepares the data
+model for multiple users; account authentication and ownership enforcement are
+delivered in Milestone 5.
 
 ## Current state and motivation
 
-Datasets and processed-upload cache entries currently live in process memory.
-They disappear on restart and are not shared between application workers.
-Categories are configuration-driven, while `who` detection is tied to
-application-specific description patterns. These defaults are suitable for an
-MVP, but users need durable datasets and a way to define their own categories
-and explain how transactions map to people.
+The user exports transactions from ABN AMRO as an XLS file each month. They may
+upload the same export again, or upload a later export that overlaps an earlier
+period. Previously processed expenses must remain available indefinitely and
+must not be categorized or counted twice. Categories and the rules that assign
+an expense to a person need to be configurable. The user needs to browse the
+combined history and filter it by category, person, and date, including quick
+month/year selection.
 
 ## Scope
 
 - Select and document a supported relational database and Python ORM, keeping
   local development straightforward and production configuration explicit.
-- Define ORM models and migrations for datasets, expense rows, and the
-  per-user expense rules needed by Milestone 5.
-- Replace the in-memory dataset store with a repository backed by the database.
-  Preserve existing upload, summary, filtering, and export API behavior where
-  possible.
-- Persist uploaded/categorized expense records and the metadata required to
-  identify and retrieve each dataset after process restarts.
+- Define ORM models and migrations for import batches, persistent expense
+  records, and the per-user expense rules needed by Milestone 5.
+- Treat an uploaded file as an import batch, not as the boundary of the user's
+  history. Query the ledger across all imports.
+- Give each expense a stable deduplication key. Check existing keys before
+  categorization, then enforce uniqueness in the database so repeated and
+  overlapping imports do not add or process known expenses again.
+- Prefer a stable transaction reference from the bank export when one is
+  available. Otherwise use a documented fingerprint over normalized bank
+  fields and preserve repeated identical rows within one import using an
+  occurrence discriminator. A fingerprint cannot perfectly distinguish two
+  truly identical transactions across different exports without a bank ID.
+- Persist normalized expense date, amount, description, category, person, and
+  source fields so history can be queried and reconstructed after restart.
+- Add historical expense queries and exports that span imports and support
+  category, person, inclusive date-range, and month/year filters.
+- Keep the existing upload, summary, filtering, and export API behavior where
+  practical, while making the historical ledger the canonical view.
 - Define lifecycle and retention behavior for datasets and generated download
   files. Persistent data must not silently inherit the current in-memory TTL.
 - Support configurable category names and a configured fallback category,
@@ -37,6 +50,9 @@ and explain how transactions map to people.
   specify how a transaction description or other available transaction fields
   identify a person. Keep the initial rule format constrained, validated, and
   understandable; do not execute arbitrary user-provided code or expressions.
+- In this single-user milestone, read category and `who` settings from validated
+  deployment configuration. Persisted per-user settings and their management
+  flow depend on authenticated ownership and belong to Milestone 5.
 - Provide migration, backup, and restore guidance appropriate to the selected
   database and deployment model.
 
@@ -55,16 +71,21 @@ and explain how transactions map to people.
 
 ## Acceptance criteria
 
-- A dataset remains available after an application restart when the configured
-  database is retained.
+- Processed expenses remain available after an application restart when the
+  configured database is retained; they do not expire.
 - Multiple app workers see the same persisted datasets.
+- Re-uploading the same file or overlapping exports skips known expenses,
+  including avoiding repeat categorization for those records.
+- Historical queries combine expenses across imports and can filter by
+  category, person, date range, and selected month/year.
 - Database schema changes are managed through versioned migrations.
-- Existing summary, filter, and export behavior is preserved, with regression
-  coverage for database-backed storage and monetary precision.
-- Users can configure category lists and a fallback category, and invalid
-  category references produce clear validation errors.
-- Users can configure supported `who` matching rules without code execution;
-  tests cover matching, precedence, unmatched transactions, and invalid rules.
+- Existing summary and export behavior is preserved where practical, with
+  regression coverage for database-backed storage, duplicate imports, date
+  filters, and monetary precision.
+- Category lists, fallback category, and supported `who` matching rules can be
+  configured through deployment settings; invalid values produce clear startup
+  errors. Tests cover matching, precedence, unmatched transactions, and invalid
+  rules. Per-user setting management is delivered after authentication.
 - Retention and deletion behavior for datasets and generated files is explicit
   and documented.
 

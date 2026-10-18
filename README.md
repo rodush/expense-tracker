@@ -1,6 +1,6 @@
 # Expense Categorizer
 
-This project is a small FastAPI-based expense categorization app that reads uploaded CSV/XLS/XLSX files and assigns categories using a configurable category list with Gemini support.
+Expense Categorizer turns monthly ABN AMRO transaction exports into a persistent household expense ledger. It assigns each expense a category and a person, skips records already imported, and lets you browse spending history across all uploads.
 
 The repository contains a Svelte frontend in [`frontend/`](./frontend/) and a
 FastAPI backend in [`app/`](./app/), deployed together as a Docker container.
@@ -8,28 +8,28 @@ FastAPI backend in [`app/`](./app/), deployed together as a Docker container.
 GitHub Actions run the frontend checks, Python checks, and Docker image build on
 pull requests.
 
-## Reporting workflow
+## Monthly import and expense history
 
-The reporting workflow is designed as:
+The workflow is:
 
-1. **Upload**: the browser sends an expense file to `POST /upload`. The file
-   must contain `date`, `amount`, and `description` columns. ABN AMRO headers `Transactiedatum`, `Transactiebedrag`, and `Omschrijving` are mapped to those English field names during processing.
-   
-   The service normalizes column names, excludes rows with positive amounts (card credits) and SEPA transfers to
-   `Savings Account` before categorization, converts retained debit amounts to
-   absolute values, derives `who`, assigns a configured category, and returns a preview. The response's `row_count`, preview, dataset, and downloads contain only the retained rows.
-   Identical input bytes and file types reuse processed rows from a one-hour in-memory cache, avoiding repeat categorization.
-2. **Dataset**: the response includes a short-lived `dataset_id` for the
-   normalized rows. The dataset is the shared source for the preview,
-   summaries, and exports; it is not a second copy with different parsing
-   rules.
-3. **Dashboard**: clients request an aggregate summary for that dataset and
-   redraw totals, breakdown tables, and charts when filters change.
+1. **Upload**: send a CSV, XLS, or XLSX file to `POST /upload`. It must contain
+   date, amount, and description columns. ABN AMRO headers `Transactiedatum`,
+   `Transactiebedrag`, and `Omschrijving` map to those fields.
+2. **Import once**: the server normalizes expenses, resolves who made each
+   expense, categorizes only records not already in the ledger, and stores the
+   result in the configured database. Identical files are recognized by their
+   content hash; overlapping exports are checked record by record.
+3. **Browse history**: the dashboard combines records from every import. Filter
+   by category, person, date range, or quick month/year selection. Export the
+   filtered results or the full history.
 
-The implementation provides a temporary full CSV download through
-`GET /download/{download_id}` and the dataset-backed summary endpoint below.
-The browser dashboard uses the same dataset and summary contract for its
-filter controls, tables, and chart.
+Positive amounts (credits) and SEPA transfers to `Savings Account` are excluded
+before categorization; retained debits are stored as positive spending amounts.
+Expenses and their categories do not expire. Database records survive process
+restarts and are shared by app instances using the same database. Without a
+stable bank transaction reference, record fingerprints cannot distinguish
+truly identical transactions across different exports; see the
+[Milestone 4 specification](./.github/specs/milestone-4.md).
 
 ## Python application structure
 
@@ -38,60 +38,58 @@ and dataset endpoints live in separate routers; their processing and reporting
 logic is handled by `UploadService` and `DatasetService` in `app/services/`.
 Routers obtain these services with FastAPI dependencies, so tests can replace
 them through `app.dependency_overrides` without patching application globals.
-`create_app` also accepts the stores, cache, categorizer, and output directory
-for explicit application-level wiring.
+`create_app` accepts injected stores, categorizer, person resolver, and output
+directory for explicit application-level wiring.
 
-`POST /upload` returns `row_count`, `category_column_added`, `columns`,
-`preview`, `download_id`, and `dataset_id`. `row_count` and `preview` include
-only retained rows, and each returned `amount` is a nonnegative numeric value.
-The download and dataset contain those same rows and amounts.
+`POST /upload` returns `row_count`, `new_transaction_count`, `duplicate_count`,
+`category_column_added`, `columns`, `preview`, `download_id`, and `dataset_id`.
+The preview includes newly stored rows for the import; repeat uploads report
+zero new records and do not categorize known transactions again.
 
 ## Reporting API contract
 
-The summary endpoint is:
+Historical expenses are queried across all import batches:
 
 ```text
-GET /datasets/{dataset_id}/summary
+GET /expenses
+GET /expenses/summary
+GET /expenses/filter-options
+GET /expenses/export
 ```
 
 Repeated query parameters select multiple values:
 
 ```text
-?category=Food&category=Transport&who=Roman&who=General
+?category=Food&category=Transport&who=Roman&date_from=2026-01-01&date_to=2026-01-31
 ```
 
-The response contains:
+`GET /expenses` returns a paginated `items` list with `total_count`, `limit`,
+and `offset`. The summary response contains:
 
-- `total_amount`: the sum of the selected retained expenses.
+- `total_amount`: the sum of selected expenses.
 - `expense_count`: the number of selected rows.
 - `categories`: category name, amount, count, and percentage.
 - `who`: person name, amount, and count.
-- `applied_filters`: the validated category and person selections.
+- `applied_filters`: the validated category, person, and date selection.
 
-Category values are validated against `CATEGORIES`. Person values are
-validated against the people present in the dataset. Multiple values for one
-filter are combined with OR semantics; category and `who` filters are combined
-with AND semantics. No filter means all rows in the dataset. An unknown
-dataset returns 404; invalid filters or malformed amounts return a clear 400
-response, and a dataset must never be used to read another dataset's rows.
-
-This contract aligns with the reporting specifications in
-[`.github/specs/archive/16-dataset-and-summary-api.md`](.github/specs/archive/16-dataset-and-summary-api.md)
-and [`.github/specs/milestone-2.md`](.github/specs/milestone-2.md). If the API
-implementation requires a field change, update those documents and this
-section together.
+Use repeated `category` and `who` query parameters for multiple selections,
+`date_from` and `date_to` for inclusive date ranges, or `year` and optional
+`month` for quick calendar filtering. Values within one filter use OR
+semantics; different filters combine with AND semantics. Filters may return
+zero matches without error. `/expenses/export` exports the same filtered
+historical records.
 
 ## Frontend application
 
-The dynamic upload, preview, filtering, download, and dashboard UI is
+The dynamic upload, historical filtering, download, and dashboard UI is
 implemented in Svelte with Vite. This is a client-side component application,
 not a SvelteKit application: FastAPI continues to serve the page, APIs, and
 compiled assets under `/static/frontend/`. Chart.js is bundled locally, so the
 browser does not load frontend code from a third-party CDN.
 
 The category doughnut chart updates with the selected filters and assigns a
-distinct color to each category in the summary response. The categorized
-expense preview is collapsed by default. Its Description column is last and
+distinct color to each category in the summary response. The historical expense
+table is paginated. Its Description column is last and
 constrained to about 300 pixels; hovering or focusing a description reveals
 its full text in a viewport-aware tooltip.
 
@@ -102,6 +100,7 @@ cd frontend
 npm ci
 npm run build
 cd ..
+uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
 
@@ -114,19 +113,15 @@ the FastAPI image.
 - Amounts are parsed as numeric values during upload. Positive values are
   treated as card credits, and SEPA transfers whose description names
   `Savings Account` are excluded before categorization. Retained negative debit
-  values are stored and reported as their absolute values. Thus uploaded
-  datasets contain expenses only, and `total_amount` is a gross spending total.
-- The reporting response should use one currency per uploaded dataset. Currency
-  metadata and the final display precision must be defined before production
-  persistence; aggregation and displayed totals must use the same rounding
-  rule.
+  values are stored and reported as their absolute values. Thus the ledger
+  contains expenses only, and `total_amount` is a gross spending total.
+- The ledger currently assumes one currency. Currency metadata and mixed
+  currency handling need to be defined before importing accounts with multiple
+  currencies.
 - A valid filter that matches no rows is not an error. It returns
-  `total_amount: 0`, `expense_count: 0`, zero-valued configured-category
-  breakdowns, and an empty `who` breakdown.
-- The existing download is a full categorized CSV generated from the same
-  normalized rows as the preview. A filtered export is not available yet and
-  must be introduced as a separate, explicit action or endpoint rather than
-  silently changing the meaning of the existing download link.
+  `total_amount: 0`, `expense_count: 0`, and empty breakdowns.
+- `/expenses/export` exports the filtered ledger. `/download/{download_id}`
+  remains available for a full categorized CSV associated with one import.
 
 ## Contribution
 
@@ -143,11 +138,11 @@ In order to contribute to the project, you need to have the following ecosystem:
 
 ### Tech stack
 
-- Python + FastAPI for backend; (TODO: SqlAlchemy as ORM)
+- Python + FastAPI + SQLAlchemy for backend and persistence
 - Svelte 5+ (not SvelteKit) for the frontend, with Vite for building and the
   frontend test/check tools declared in `frontend/package.json`
 - PicoCSS for styling
-- TODO: PostgreSQL as DB (persistence layer)
+- SQLite by default; PostgreSQL is supported for hosted deployments
 
 ## Run locally
 
@@ -197,7 +192,7 @@ local and single-host deployments; see the database guide before choosing a
 multi-host deployment database.
 
 Database setup, migrations, production configuration, backup/restore, and
-current dataset/download retention behavior are documented in
+current expense/download retention behavior are documented in
 [`docs/database.md`](./docs/database.md).
 
 ## Environment variables
@@ -270,7 +265,7 @@ categorization is covered with deterministic fallbacks and mocks.
 
 The release gate also includes API contract tests
 for category-only, person-only, combined, multi-value, invalid-filter,
-unknown-dataset, malformed-amount, negative-amount, and empty-result cases.
+unknown-import, malformed-amount, negative-amount, and empty-result cases.
 Manually verify upload initialization, filter reset, loading/error/empty
 states, chart/table/download consistency, and safe text rendering of uploaded
 descriptions.
@@ -279,9 +274,9 @@ descriptions.
 
 ### Persistence and rollout notes
 
-Datasets use the configured relational database and do not expire by default.
+Expense records use the configured relational database and do not expire.
 Account ownership enforcement, user-visible retention/deletion, currency
 metadata, and automated cleanup remain future production work. See
 [`docs/database.md`](./docs/database.md) for setup, migrations, backup/restore,
-and current lifecycle boundaries. Summary, preview, and export continue to use
-the same normalized dataset boundary.
+and current lifecycle boundaries. Import batches record upload metadata; the
+ledger is the canonical source for history, summaries, and historical exports.

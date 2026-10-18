@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.config import Settings, settings
 from app.main import app, create_app
 from app.services import gemini_service
+from app.services.dataset_store import DatasetStore
 from app.services.gemini_service import normalize_category
 
 client = TestClient(app)
@@ -288,7 +289,7 @@ def test_ui_route_serves_the_browser_page() -> None:
     response = cast(Any, client).get("/ui")
 
     assert response.status_code == 200
-    assert "<title>Expense tracker · Spending insights</title>" in response.text
+    assert "<title>Expense tracker · Expense history</title>" in response.text
     assert '<div id="app"></div>' in response.text
     assert '<link rel="stylesheet" href="/static/frontend/app.css">' in response.text
     assert (
@@ -299,18 +300,23 @@ def test_ui_route_serves_the_browser_page() -> None:
 def test_upload_returns_downloadable_csv_file() -> None:
     csv_content = "date,amount,description\n2026-07-01,-15.50,PAS543 Coffee Shop\n"
 
-    response = client.post(
-        "/upload",
-        files={"file": ("expenses.csv", csv_content.encode("utf-8"), "text/csv")},
-    )
+    async def categorize(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [{**row, "category": "Food"} for row in rows]
 
-    assert response.status_code == 200
-    payload = response.json()
-    download_id = payload["download_id"]
-    assert download_id
-    assert payload["preview"][0]["who"] == "Roman"
+    upload_app = create_app(data_store=DatasetStore(), categorizer=categorize)
+    with TestClient(upload_app) as upload_client:
+        response = upload_client.post(
+            "/upload",
+            files={"file": ("expenses.csv", csv_content.encode("utf-8"), "text/csv")},
+        )
 
-    download_response = client.get(f"/download/{download_id}")
-    assert download_response.status_code == 200
-    assert "who" in download_response.text
-    assert "category" in download_response.text
+        assert response.status_code == 200
+        payload = response.json()
+        download_id = payload["download_id"]
+        assert download_id
+        assert payload["preview"][0]["who"] == "Roman"
+
+        download_response = upload_client.get(f"/download/{download_id}")
+        assert download_response.status_code == 200
+        assert "who" in download_response.text
+        assert "category" in download_response.text

@@ -7,8 +7,14 @@
     whoOptions,
     selectedCategories = $bindable([]),
     selectedPeople = $bindable([]),
+    dateFrom = $bindable(''),
+    dateTo = $bindable(''),
+    selectedYear = $bindable(''),
+    selectedMonth = $bindable(''),
+    years = [],
     summary,
     onclearfilters,
+    onfilterchange,
   } = $props();
   let categoryChartCanvas = $state();
   let categorySort = $state({ key: 'amount', direction: 'desc' });
@@ -20,7 +26,15 @@
   const activeFilters = $derived([
     ...selectedCategories.map((value) => `category: ${value}`),
     ...selectedPeople.map((value) => `who: ${value}`),
+    ...(dateFrom ? [`from ${dateFrom}`] : []),
+    ...(dateTo ? [`through ${dateTo}`] : []),
+    ...(selectedMonth && selectedYear ? [`${new Date(Number(selectedYear), Number(selectedMonth) - 1).toLocaleString(undefined, { month: 'long' })} ${selectedYear}`] : []),
+    ...(!selectedMonth && selectedYear ? [String(selectedYear)] : []),
   ]);
+
+  function changed() {
+    onfilterchange?.();
+  }
 
   $effect(() => {
     const categories = summary?.categories;
@@ -79,7 +93,7 @@
         id="clearFilters"
         type="button"
         class="clear-filter-button"
-        disabled={!selectedCategories.length && !selectedPeople.length}
+        disabled={!selectedCategories.length && !selectedPeople.length && !dateFrom && !dateTo && !selectedYear && !selectedMonth}
         onclick={onclearfilters}
       >Clear filters</button>
     </div>
@@ -93,6 +107,7 @@
                 bind:group={selectedCategories}
                 type="checkbox"
                 value={category}
+                onchange={changed}
               />
               {category}
             </label>
@@ -108,11 +123,42 @@
                 bind:group={selectedPeople}
                 type="checkbox"
                 value={person}
+                onchange={changed}
               />
               {person}
             </label>
           {/each}
         </div>
+      </fieldset>
+    </div>
+    <div class="date-filters">
+      <fieldset class="filter-group date-range-group">
+        <legend>Date range</legend>
+        <label>From date
+          <input aria-label="From date" type="date" bind:value={dateFrom} oninput={() => onfilterchange?.('range')} />
+        </label>
+        <label>To date
+          <input aria-label="To date" type="date" bind:value={dateTo} oninput={() => onfilterchange?.('range')} />
+        </label>
+      </fieldset>
+      <fieldset class="filter-group quick-date-group">
+        <legend>Quick month and year</legend>
+        <label>Year
+        <select aria-label="Year" bind:value={selectedYear} onchange={() => onfilterchange?.('quick')}>
+            <option value="">All years</option>
+            {#each years as year}
+              <option value={String(year)}>{year}</option>
+            {/each}
+          </select>
+        </label>
+        <label>Month
+        <select aria-label="Month" bind:value={selectedMonth} onchange={() => onfilterchange?.('quick')} disabled={!selectedYear}>
+            <option value="">All months</option>
+            {#each Array.from({ length: 12 }, (_, index) => index + 1) as month}
+              <option value={String(month)}>{new Date(2000, month - 1).toLocaleString(undefined, { month: 'long' })}</option>
+            {/each}
+          </select>
+        </label>
       </fieldset>
     </div>
     <p id="activeFilters" class="active-filters" aria-live="polite">

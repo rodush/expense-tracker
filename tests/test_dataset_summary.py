@@ -5,17 +5,43 @@ import io
 import sys
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.main import app
-from app.services.dataset_store import dataset_store
+import pytest
+from fastapi.testclient import TestClient
 
-client = TestClient(app)
+from app.main import create_app
+from app.services.dataset_store import DatasetStore
 
 
-def _upload_dataset() -> str:
+async def _categorize(rows):
+    return [
+        {
+            **row,
+            "category": "Shopping"
+            if "shop" in str(row.get("description", "")).casefold()
+            else "Transport",
+        }
+        for row in rows
+    ]
+
+
+dataset_store = DatasetStore()
+app = create_app(data_store=dataset_store, categorizer=_categorize)
+
+
+@pytest.fixture
+def client():
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+@pytest.fixture(autouse=True)
+def clear_test_store() -> None:
+    dataset_store.clear()
+
+
+def _upload_dataset(client: TestClient) -> str:
     csv_content = (
         "date,amount,description\n"
         "2026-07-01,-10.00,PAS543 shop purchase\n"
@@ -30,8 +56,8 @@ def _upload_dataset() -> str:
     return response.json()["dataset_id"]
 
 
-def test_upload_returns_dataset_id_and_summary_aggregates_debit_amounts() -> None:
-    dataset_id = _upload_dataset()
+def test_upload_returns_dataset_id_and_summary_aggregates_debit_amounts(client) -> None:
+    dataset_id = _upload_dataset(client)
 
     response = client.get(f"/datasets/{dataset_id}/summary")
 
@@ -47,8 +73,8 @@ def test_upload_returns_dataset_id_and_summary_aggregates_debit_amounts() -> Non
     }
 
 
-def test_summary_applies_multiple_filters_with_and_semantics() -> None:
-    dataset_id = _upload_dataset()
+def test_summary_applies_multiple_filters_with_and_semantics(client) -> None:
+    dataset_id = _upload_dataset(client)
 
     response = client.get(
         f"/datasets/{dataset_id}/summary",
@@ -65,7 +91,7 @@ def test_summary_applies_multiple_filters_with_and_semantics() -> None:
     }
 
 
-def test_summary_supports_multiple_values_and_reports_percentages() -> None:
+def test_summary_supports_multiple_values_and_reports_percentages(client) -> None:
     dataset_id = dataset_store.create(
         [
             {"amount": "10.005", "category": "Food", "who": "Roman"},
@@ -94,8 +120,8 @@ def test_summary_supports_multiple_values_and_reports_percentages() -> None:
     assert categories["Shopping"]["percentage"] == 79.97
 
 
-def test_summary_returns_zero_values_for_empty_filter_result() -> None:
-    dataset_id = _upload_dataset()
+def test_summary_returns_zero_values_for_empty_filter_result(client) -> None:
+    dataset_id = _upload_dataset(client)
 
     response = client.get(
         f"/datasets/{dataset_id}/summary",
@@ -110,8 +136,8 @@ def test_summary_returns_zero_values_for_empty_filter_result() -> None:
     assert payload["who"] == []
 
 
-def test_summary_rejects_invalid_filters_and_unknown_datasets() -> None:
-    dataset_id = _upload_dataset()
+def test_summary_rejects_invalid_filters_and_unknown_datasets(client) -> None:
+    dataset_id = _upload_dataset(client)
 
     invalid_category = client.get(
         f"/datasets/{dataset_id}/summary",
@@ -131,7 +157,7 @@ def test_summary_rejects_invalid_filters_and_unknown_datasets() -> None:
 
 
 def test_summary_rejects_malformed_amount_from_dataset_store(
-    monkeypatch,
+    monkeypatch, client
 ) -> None:
     monkeypatch.setattr(
         dataset_store,
@@ -145,8 +171,8 @@ def test_summary_rejects_malformed_amount_from_dataset_store(
     assert response.json()["detail"] == "amount must be numeric"
 
 
-def test_filtered_export_uses_summary_filters_and_csv_contract() -> None:
-    dataset_id = _upload_dataset()
+def test_filtered_export_uses_summary_filters_and_csv_contract(client) -> None:
+    dataset_id = _upload_dataset(client)
 
     response = client.get(
         f"/datasets/{dataset_id}/export",
@@ -168,8 +194,8 @@ def test_filtered_export_uses_summary_filters_and_csv_contract() -> None:
     ]
 
 
-def test_filtered_export_rejects_invalid_filters_and_unknown_datasets() -> None:
-    dataset_id = _upload_dataset()
+def test_filtered_export_rejects_invalid_filters_and_unknown_datasets(client) -> None:
+    dataset_id = _upload_dataset(client)
 
     invalid_filter = client.get(
         f"/datasets/{dataset_id}/export",
@@ -183,7 +209,7 @@ def test_filtered_export_rejects_invalid_filters_and_unknown_datasets() -> None:
     assert unknown_dataset.status_code == 404
 
 
-def test_upload_rejects_malformed_amount() -> None:
+def test_upload_rejects_malformed_amount(client) -> None:
     response = client.post(
         "/upload",
         files={
