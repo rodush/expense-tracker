@@ -3,22 +3,9 @@
   import { formatTransactionDate } from '../date-format';
   import { calculateTooltipPosition } from '../tooltip-position';
 
-  let { rows, filteredDownloadUrl, totalCount = 0, offset = 0, limit = 25, loading = false, onprevious, onnext } = $props();
+  let { rows, downloadId, datasetId, filteredDownloadUrl } = $props();
   let tooltipElement = $state();
   let tooltip = $state({ text: '', rowIndex: null, left: 0, top: 0 });
-  let sort = $state({ key: 'date', direction: 'desc' });
-  const sortedRows = $derived([...rows].sort((left, right) => {
-    const a = left[sort.key];
-    const b = right[sort.key];
-    const comparison = sort.key === 'amount'
-      ? Number(a ?? 0) - Number(b ?? 0)
-      : String(a ?? '').localeCompare(String(b ?? ''), undefined, { numeric: true });
-    return comparison * (sort.direction === 'asc' ? 1 : -1);
-  }));
-
-  function toggleSort(key) {
-    sort = { key, direction: sort.key === key && sort.direction === 'asc' ? 'desc' : 'asc' };
-  }
 
   async function showTooltip(index, description, x, y) {
     tooltip.rowIndex = index;
@@ -57,22 +44,24 @@
   <header class="section-heading transactions-heading">
     <div>
       <p class="eyebrow">Transaction detail</p>
-      <h2 id="transactionsHeading">Expense history</h2>
+      <h2 id="transactionsHeading">Recent expenses</h2>
     </div>
-    <span class="row-count">{totalCount} {totalCount === 1 ? 'expense' : 'expenses'}</span>
+    <span class="row-count">{rows.length} {rows.length === 1 ? 'expense' : 'expenses'}</span>
   </header>
   <nav class="download-actions" aria-label="Export expenses">
-    <a id="filteredDownloadLink" class="download-primary" href={filteredDownloadUrl}>
-      Download filtered CSV <span aria-hidden="true">↓</span>
-    </a>
+    {#if datasetId}
+      <a id="filteredDownloadLink" class="download-primary" href={filteredDownloadUrl}>
+        Download filtered CSV <span aria-hidden="true">↓</span>
+      </a>
+    {/if}
+    {#if downloadId}
+      <a id="downloadLink" class="download-secondary" href={`/download/${encodeURIComponent(downloadId)}`}>
+        Download full statement
+      </a>
+    {/if}
   </nav>
-  {#if loading}
-    <p class="empty-state" role="status">Loading saved expenses…</p>
-  {:else if totalCount === 0}
-    <p class="empty-state" role="status">No saved expenses match these filters.</p>
-  {:else}
-  <details class="transaction-details" open>
-    <summary><span>Review transactions</span><span class="summary-count">{rows.length} of {totalCount} rows</span></summary>
+  <details class="transaction-details">
+    <summary><span>Review transactions</span><span class="summary-count">{rows.length} rows</span></summary>
     <div class="table-scroll">
       <table id="resultsTable">
         <caption>Expenses included in the current report</caption>
@@ -85,13 +74,15 @@
         </colgroup>
         <thead>
           <tr>
-          {#each [['date', 'Date'], ['amount', 'Amount'], ['who', 'Person'], ['category', 'Category'], ['description', 'Description']] as [key, label]}
-            <th scope="col"><button class="sort-button" aria-label={`Sort by ${label}`} onclick={() => toggleSort(key)}>{label} <span aria-hidden="true">{sort.key === key ? (sort.direction === 'asc' ? '↑' : '↓') : '↕'}</span></button></th>
-          {/each}
+            <th scope="col">Date</th>
+            <th scope="col">Amount</th>
+            <th scope="col">Person</th>
+            <th scope="col">Category</th>
+            <th scope="col">Description</th>
           </tr>
         </thead>
         <tbody>
-          {#each sortedRows as row, index}
+          {#each rows as row, index}
             <tr>
               <td>{formatTransactionDate(row.date)}</td>
               <td>{formatAmount(row.amount ?? 0)}</td>
@@ -123,12 +114,6 @@
       </table>
     </div>
   </details>
-  <nav class="history-pagination" aria-label="Expense history pages">
-    <button type="button" class="clear-filter-button" onclick={onprevious} disabled={offset === 0}>Previous</button>
-    <span>Showing {offset + 1}–{Math.min(offset + limit, totalCount)} of {totalCount}</span>
-    <button type="button" class="clear-filter-button" aria-label="Next page" onclick={onnext} disabled={offset + limit >= totalCount}>Next page</button>
-  </nav>
-  {/if}
 </section>
 
 {#if tooltip.rowIndex !== null}

@@ -7,34 +7,18 @@
     whoOptions,
     selectedCategories = $bindable([]),
     selectedPeople = $bindable([]),
-    dateFrom = $bindable(''),
-    dateTo = $bindable(''),
-    selectedYear = $bindable(''),
-    selectedMonth = $bindable(''),
-    years = [],
     summary,
+    isLoading,
+    error,
+    onfilterschange,
     onclearfilters,
-    onfilterchange,
   } = $props();
   let categoryChartCanvas = $state();
-  let categorySort = $state({ key: 'amount', direction: 'desc' });
-  let whoSort = $state({ key: 'amount', direction: 'desc' });
-
-  const sortedCategories = $derived(sortItems(summary?.categories ?? [], categorySort));
-  const sortedPeople = $derived(sortItems(summary?.who ?? [], whoSort));
 
   const activeFilters = $derived([
     ...selectedCategories.map((value) => `category: ${value}`),
     ...selectedPeople.map((value) => `who: ${value}`),
-    ...(dateFrom ? [`from ${dateFrom}`] : []),
-    ...(dateTo ? [`through ${dateTo}`] : []),
-    ...(selectedMonth && selectedYear ? [`${new Date(Number(selectedYear), Number(selectedMonth) - 1).toLocaleString(undefined, { month: 'long' })} ${selectedYear}`] : []),
-    ...(!selectedMonth && selectedYear ? [String(selectedYear)] : []),
   ]);
-
-  function changed() {
-    onfilterchange?.();
-  }
 
   $effect(() => {
     const categories = summary?.categories;
@@ -56,31 +40,16 @@
     }).format(Number(amount));
   }
 
-  function sortItems(items, sort) {
-    return [...items].sort((left, right) => {
-      const a = left[sort.key];
-      const b = right[sort.key];
-      const comparison = typeof a === 'number' && typeof b === 'number'
-        ? a - b
-        : String(a ?? '').localeCompare(String(b ?? ''), undefined, { numeric: true });
-      return comparison * (sort.direction === 'asc' ? 1 : -1);
-    });
-  }
-
-  function toggleSort(state, key) {
-    state = { key, direction: state.key === key && state.direction === 'asc' ? 'desc' : 'asc' };
-    return state;
-  }
-
   onDestroy(destroyCategoryChart);
 </script>
 
-<section id="dashboard" class="dashboard" aria-labelledby="dashboardHeading">
+<section id="dashboard" class="dashboard" aria-labelledby="dashboardHeading" aria-busy={isLoading}>
   <header class="section-heading">
     <div>
       <p class="eyebrow">Overview</p>
       <h2 id="dashboardHeading">Spending overview</h2>
     </div>
+    {#if isLoading}<span class="loading-note" role="status">Updating…</span>{/if}
   </header>
 
   <section class="filter-card" aria-labelledby="filterHeading">
@@ -93,7 +62,7 @@
         id="clearFilters"
         type="button"
         class="clear-filter-button"
-        disabled={!selectedCategories.length && !selectedPeople.length && !dateFrom && !dateTo && !selectedYear && !selectedMonth}
+        disabled={!selectedCategories.length && !selectedPeople.length}
         onclick={onclearfilters}
       >Clear filters</button>
     </div>
@@ -107,7 +76,7 @@
                 bind:group={selectedCategories}
                 type="checkbox"
                 value={category}
-                onchange={changed}
+                onchange={onfilterschange}
               />
               {category}
             </label>
@@ -123,7 +92,7 @@
                 bind:group={selectedPeople}
                 type="checkbox"
                 value={person}
-                onchange={changed}
+                onchange={onfilterschange}
               />
               {person}
             </label>
@@ -131,41 +100,12 @@
         </div>
       </fieldset>
     </div>
-    <div class="date-filters">
-      <fieldset class="filter-group date-range-group">
-        <legend>Date range</legend>
-        <label>From date
-          <input aria-label="From date" type="date" bind:value={dateFrom} oninput={() => onfilterchange?.('range')} />
-        </label>
-        <label>To date
-          <input aria-label="To date" type="date" bind:value={dateTo} oninput={() => onfilterchange?.('range')} />
-        </label>
-      </fieldset>
-      <fieldset class="filter-group quick-date-group">
-        <legend>Quick month and year</legend>
-        <label>Year
-        <select aria-label="Year" bind:value={selectedYear} onchange={() => onfilterchange?.('quick')}>
-            <option value="">All years</option>
-            {#each years as year}
-              <option value={String(year)}>{year}</option>
-            {/each}
-          </select>
-        </label>
-        <label>Month
-        <select aria-label="Month" bind:value={selectedMonth} onchange={() => onfilterchange?.('quick')} disabled={!selectedYear}>
-            <option value="">All months</option>
-            {#each Array.from({ length: 12 }, (_, index) => index + 1) as month}
-              <option value={String(month)}>{new Date(new Date().getFullYear(), month - 1, 1).toLocaleString(undefined, { month: 'long' })}</option>
-            {/each}
-          </select>
-        </label>
-      </fieldset>
-    </div>
     <p id="activeFilters" class="active-filters" aria-live="polite">
       {activeFilters.length ? `Showing ${activeFilters.join(' · ')}` : 'Showing all expenses'}
     </p>
   </section>
 
+  {#if error}<p id="dashboardError" class="error-message" role="alert">{error}</p>{/if}
   {#if summary?.expense_count === 0}
     <p id="dashboardEmpty" class="empty-state" role="status">
       <strong>No expenses match these filters.</strong>
@@ -199,24 +139,17 @@
               aria-label="Doughnut chart showing spending by category"
             ></canvas>
           </div>
-          <details class="category-totals">
-            <summary>Spending totals by category</summary>
           <div class="table-scroll">
             <table id="categoryTable">
-              <caption class="visually-hidden">Spending totals by category</caption>
-              <thead><tr>
-                {#each [['name', 'Category'], ['amount', 'Amount'], ['count', 'Count']] as [key, label]}
-                  <th scope="col"><button class="sort-button" aria-label={`Sort by ${label}`} onclick={() => { categorySort = toggleSort(categorySort, key); }}>{label} <span aria-hidden="true">{categorySort.key === key ? (categorySort.direction === 'asc' ? '↑' : '↓') : '↕'}</span></button></th>
-                {/each}
-              </tr></thead>
+              <caption>Spending totals by category</caption>
+              <thead><tr><th scope="col">Category</th><th scope="col">Amount</th><th scope="col">Count</th></tr></thead>
               <tbody>
-                {#each sortedCategories as item}
+                {#each summary.categories as item}
                   <tr><th scope="row">{item.name}</th><td>{formatAmount(item.amount)}</td><td>{item.count}</td></tr>
                 {/each}
               </tbody>
             </table>
           </div>
-          </details>
         </section>
 
         <section class="breakdown-card" aria-labelledby="personHeading">
@@ -226,13 +159,9 @@
           <div class="table-scroll people-table-scroll">
             <table id="whoTable">
               <caption>Spending totals by person</caption>
-              <thead><tr>
-                {#each [['name', 'Person'], ['amount', 'Amount'], ['count', 'Count']] as [key, label]}
-                  <th scope="col"><button class="sort-button" aria-label={`Sort by ${label}`} onclick={() => { whoSort = toggleSort(whoSort, key); }}>{label} <span aria-hidden="true">{whoSort.key === key ? (whoSort.direction === 'asc' ? '↑' : '↓') : '↕'}</span></button></th>
-                {/each}
-              </tr></thead>
+              <thead><tr><th scope="col">Person</th><th scope="col">Amount</th><th scope="col">Count</th></tr></thead>
               <tbody>
-                {#each sortedPeople as item}
+                {#each summary.who as item}
                   <tr><th scope="row">{item.name}</th><td>{formatAmount(item.amount)}</td><td>{item.count}</td></tr>
                 {/each}
               </tbody>

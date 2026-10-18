@@ -1,15 +1,14 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App.svelte';
-import { buildExportUrl, fetchExpenses, fetchFilterOptions, fetchSummary, uploadFile } from './api';
+import { fetchSummary, uploadFile } from './api';
+import { createOrUpdateCategoryChart } from './chart';
 import { formatTransactionDate } from './date-format';
 
 vi.mock('./api', () => ({
   uploadFile: vi.fn(),
-  fetchExpenses: vi.fn(),
-  fetchFilterOptions: vi.fn(),
   fetchSummary: vi.fn(),
-  buildExportUrl: vi.fn(() => '/expenses/export'),
+  buildExportUrl: vi.fn(() => '/export'),
 }));
 
 vi.mock('./chart', () => ({
@@ -17,77 +16,66 @@ vi.mock('./chart', () => ({
   destroyCategoryChart: vi.fn(),
 }));
 
-const rows = [{
-  date: '2026-01-01', amount: 12, who: 'Ava', category: 'Food', description: '<img src=x onerror=alert(1)>',
-}];
-
-function mockHistory({ items = rows, total_count = items.length } = {}) {
-  fetchFilterOptions.mockResolvedValue({ categories: ['Food', 'Travel'], who: ['Ava', 'Mia'], years: [2026, 2025] });
-  fetchExpenses.mockResolvedValue({ items, total_count, limit: 25, offset: 0 });
-  fetchSummary.mockResolvedValue({
-    expense_count: items.length, total_amount: 12,
-    categories: [{ name: 'Food', amount: 12, count: 1, percentage: 100 }],
-    who: [{ name: 'Ava', amount: 12, count: 1 }],
-  });
-}
-
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
 
-describe('historical expense dashboard', () => {
-  it('shows the upload action and loads saved expenses on first visit', async () => {
-    mockHistory();
+describe('expense dashboard', () => {
+  it('guides first-time users through the statement upload', () => {
     render(App);
 
-    expect(screen.getByRole('heading', { name: 'Make sense of your spending.' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: 'Make sense of your spending.' })).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Upload an expense statement' })).toBeTruthy();
-    expect(await screen.findByText('<img src=x onerror=alert(1)>')).toBeTruthy();
-    expect(screen.getByText(formatTransactionDate(rows[0].date))).toBeTruthy();
-    expect(screen.queryByText(rows[0].date)).toBeNull();
-    expect(fetchFilterOptions).toHaveBeenCalledOnce();
-    expect(fetchExpenses).toHaveBeenCalledWith(expect.objectContaining({ offset: 0, limit: 25 }));
-    expect(fetchSummary).toHaveBeenCalled();
+    expect(screen.getByText('CSV, XLS, or XLSX · up to 5 MB')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Spending overview' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Recent expenses' })).toBeNull();
+    expect(fetchSummary).not.toHaveBeenCalled();
   });
 
-  it('loads filtered history for category, person, date range and quick month/year selectors', async () => {
-    mockHistory();
-    render(App);
-    await screen.findByText('<img src=x onerror=alert(1)>');
-
-    await fireEvent.click(screen.getByRole('checkbox', { name: 'Food' }));
-    await waitFor(() => expect(fetchExpenses).toHaveBeenLastCalledWith(expect.objectContaining({ categories: ['Food'] })));
-    await fireEvent.input(screen.getByLabelText('From date'), { target: { value: '2026-01-01' } });
-    await waitFor(() => expect(fetchExpenses).toHaveBeenLastCalledWith(expect.objectContaining({ dateFrom: '2026-01-01', year: '', month: '' })));
-    await fireEvent.change(screen.getByLabelText('Year'), { target: { value: '2026' } });
-    await waitFor(() => expect(fetchExpenses).toHaveBeenLastCalledWith(expect.objectContaining({ dateFrom: '', year: '2026' })));
-    await fireEvent.change(screen.getByLabelText('Month'), { target: { value: '1' } });
-    await waitFor(() => expect(fetchExpenses).toHaveBeenLastCalledWith(expect.objectContaining({ year: '2026', month: '1' })));
-  });
-
-  it('paginates the saved history and exports with the active filters', async () => {
-    mockHistory({ total_count: 40 });
-    render(App);
-    await screen.findByText('<img src=x onerror=alert(1)>');
-
-    await fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
-    await waitFor(() => expect(fetchExpenses).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 25, limit: 25 })));
-    expect(buildExportUrl).toHaveBeenLastCalledWith(expect.objectContaining({ categories: [], who: [] }));
-    expect(screen.getByRole('link', { name: /Download filtered CSV/ })).toBeTruthy();
-  });
-
-  it('refreshes the shared history after an upload and reports duplicate counts', async () => {
-    mockHistory({ items: [], total_count: 0 });
-    uploadFile.mockResolvedValue({ row_count: 5, new_transaction_count: 3, duplicate_count: 2 });
+  it('renders uploaded descriptions as text and sends categories to the chart', async () => {
+    uploadFile.mockResolvedValue({
+      dataset_id: 'dataset-1',
+      download_id: 'download-1',
+      preview: [{
+        date: '2026-01-01',
+        amount: 12,
+        who: 'Ava',
+        category: 'Food',
+        description: '<img src=x onerror=alert(1)>',
+      }],
+    });
+    fetchSummary.mockResolvedValue({
+      expense_count: 1,
+      total_amount: 12,
+      categories: [{ name: 'Food', amount: 12, count: 1 }],
+      who: [{ name: 'Ava', amount: 12, count: 1 }],
+    });
     const { container } = render(App);
 
     await fireEvent.change(container.querySelector('#fileInput'), {
       target: { files: [new File(['data'], 'expenses.csv', { type: 'text/csv' })] },
     });
-    await fireEvent.click(screen.getByRole('button', { name: 'Import expenses' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Analyze expenses' }));
 
-    expect(await screen.findByText(/3 new expenses added; 2 duplicates skipped/)).toBeTruthy();
-    await waitFor(() => expect(fetchExpenses.mock.calls.length).toBeGreaterThan(1));
+    expect(await screen.findByText('<img src=x onerror=alert(1)>')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Your spending, at a glance.' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Make sense of your spending.' })).toBeNull();
+    expect(screen.getByText(formatTransactionDate('2026-01-01'))).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Spending overview' })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'Food' })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'Ava' })).toBeTruthy();
+    expect(container.querySelector('#resultsTable img')).toBeNull();
+    await waitFor(() => expect(fetchSummary).toHaveBeenCalledWith(
+      'dataset-1',
+      [],
+      [],
+      expect.anything(),
+    ));
+    await waitFor(() => expect(createOrUpdateCategoryChart).toHaveBeenCalledWith(
+      expect.any(HTMLCanvasElement),
+      [{ name: 'Food', amount: 12, count: 1 }],
+      [12],
+    ));
   });
 });
