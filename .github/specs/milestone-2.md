@@ -164,7 +164,7 @@ The endpoint should:
 
 During upload, exclude rows with positive amounts before categorization because
 they represent card credits. Also exclude SEPA transfers whose description
-identifies `Naam: Savings Account`; these are savings movements, not expenses.
+contains `4265768` (last digits of the account number) - these are savings movements, not expenses.
 Treat negative input amounts as expenses by converting them to absolute values
 before categorization and storage. The preview, summary, and exports therefore
 contain expenses only and report nonnegative amounts. The summary must

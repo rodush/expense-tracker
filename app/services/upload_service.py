@@ -46,7 +46,7 @@ def _is_savings_transfer(description: Any) -> bool:
     normalized_description = " ".join(str(description).casefold().split())
     return (
         "sepa overboeking" in normalized_description
-        and "naam: savings account" in normalized_description
+        and "4265768" in normalized_description
     )
 
 
