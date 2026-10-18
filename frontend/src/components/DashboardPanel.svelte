@@ -83,10 +83,16 @@
     </div>
   </header>
 
-  <section class="filter-card" aria-labelledby="filterHeading">
+  <details class="filter-card" aria-labelledby="filterHeading" open>
+    <summary class="filter-card-summary">
+      <span id="filterHeading" class="filter-card-title">Filter your expenses</span>
+      <span class="selected-filter-count" aria-live="polite">
+        {activeFilters.length} selected {activeFilters.length === 1 ? 'filter' : 'filters'}
+      </span>
+    </summary>
+    <div class="filter-card-content">
     <div class="filter-card-heading">
       <div>
-        <h3 id="filterHeading">Filter your expenses</h3>
         <p>Choose one or more options to narrow this report.</p>
       </div>
       <button
@@ -164,7 +170,8 @@
     <p id="activeFilters" class="active-filters" aria-live="polite">
       {activeFilters.length ? `Showing ${activeFilters.join(' · ')}` : 'Showing all expenses'}
     </p>
-  </section>
+    </div>
+  </details>
 
   {#if summary?.expense_count === 0}
     <p id="dashboardEmpty" class="empty-state" role="status">
@@ -174,19 +181,6 @@
   {/if}
   {#if summary}
     <div id="dashboardContent" class="report-grid">
-      <section class="summary-cards" aria-label="Spending totals">
-        <article class="summary-card summary-card-primary">
-          <span class="metric-icon" aria-hidden="true">↗</span>
-          <p class="metric-label">Total spend</p>
-          <p id="totalAmount" class="metric-value">{formatAmount(summary.total_amount)}</p>
-        </article>
-        <article class="summary-card">
-          <span class="metric-icon metric-icon-muted" aria-hidden="true">#</span>
-          <p class="metric-label">Transactions</p>
-          <p id="expenseCount" class="metric-value">{summary.expense_count}</p>
-        </article>
-      </section>
-
       <div class="breakdown-grid">
         <section class="breakdown-card" aria-labelledby="categoryHeading">
           <header class="breakdown-heading">
@@ -219,26 +213,33 @@
           </details>
         </section>
 
-        <section class="breakdown-card" aria-labelledby="personHeading">
-          <header class="breakdown-heading">
-            <div><p class="eyebrow">Who spent it</p><h3 id="personHeading">By person</h3></div>
-          </header>
-          <div class="table-scroll people-table-scroll">
-            <table id="whoTable">
-              <caption>Spending totals by person</caption>
-              <thead><tr>
-                {#each [['name', 'Person'], ['amount', 'Amount'], ['count', 'Count']] as [key, label]}
-                  <th scope="col"><button class="sort-button" aria-label={`Sort by ${label}`} onclick={() => { whoSort = toggleSort(whoSort, key); }}>{label} <span aria-hidden="true">{whoSort.key === key ? (whoSort.direction === 'asc' ? '↑' : '↓') : '↕'}</span></button></th>
-                {/each}
-              </tr></thead>
-              <tbody>
-                {#each sortedPeople as item}
-                  <tr><th scope="row">{item.name}</th><td>{formatAmount(item.amount)}</td><td>{item.count}</td></tr>
-                {/each}
-              </tbody>
-            </table>
+        <div class="people-column">
+          <section class="breakdown-card" aria-labelledby="personHeading">
+            <header class="breakdown-heading">
+              <div><p class="eyebrow">Who spent it</p><h3 id="personHeading">By person</h3></div>
+            </header>
+            <div class="table-scroll people-table-scroll">
+              <table id="whoTable">
+                <caption>Spending totals by person</caption>
+                <thead><tr>
+                  {#each [['name', 'Person'], ['amount', 'Amount'], ['count', 'Count']] as [key, label]}
+                    <th scope="col"><button class="sort-button" aria-label={`Sort by ${label}`} onclick={() => { whoSort = toggleSort(whoSort, key); }}>{label} <span aria-hidden="true">{whoSort.key === key ? (whoSort.direction === 'asc' ? '↑' : '↓') : '↕'}</span></button></th>
+                  {/each}
+                </tr></thead>
+                <tbody>
+                  {#each sortedPeople as item}
+                    <tr><th scope="row">{item.name}</th><td>{formatAmount(item.amount)}</td><td>{item.count}</td></tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <article class="summary-card summary-card-primary total-spend-card" aria-label="Total spend">
+            <span class="metric-icon" aria-hidden="true">↗</span>
+            <p class="metric-label">Total spend</p>
+            <p id="totalAmount" class="metric-value">{formatAmount(summary.total_amount)}</p>
+          </article>
           </div>
-        </section>
       </div>
     </div>
   {/if}

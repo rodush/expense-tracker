@@ -34,4 +34,10 @@ describe('category chart', () => {
       dataIndex: 0,
     })).toBe('Food: 8.00');
   });
+
+  it('places the category legend beside the doughnut chart', () => {
+    createOrUpdateCategoryChart(document.createElement('canvas'), [{ name: 'Food', amount: 20 }], [20]);
+
+    expect(charts[0].config.options.plugins.legend.position).toBe('right');
+  });
 });
