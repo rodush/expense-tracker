@@ -1,31 +1,102 @@
 <script>
-  import { onDestroy } from 'svelte';
-  import { fetchSummary, uploadFile, buildExportUrl } from './api';
+  import { onMount } from 'svelte';
+  import { uploadFile, fetchExpenses, fetchFilterOptions, fetchSummary, buildExportUrl } from './api';
   import DashboardPanel from './components/DashboardPanel.svelte';
   import PreviewPanel from './components/PreviewPanel.svelte';
   import UploadPanel from './components/UploadPanel.svelte';
 
+  const pageSize = 25;
   let isUploading = $state(false);
   let uploadError = $state('');
-  let datasetId = $state(null);
-  let downloadId = $state(null);
-  let previewRows = $state([]);
+  let uploadMessage = $state('');
+  let hasUploaded = $state(false);
+  let historyError = $state('');
+  let isLoadingHistory = $state(false);
+  let rows = $state([]);
+  let totalCount = $state(0);
+  let summary = $state(null);
   let categoryOptions = $state([]);
   let whoOptions = $state([]);
+  let years = $state([]);
   let selectedCategories = $state([]);
   let selectedPeople = $state([]);
-  let summary = $state(null);
-  let isDashboardLoading = $state(false);
-  let dashboardError = $state('');
-  let summaryController;
+  let dateFrom = $state('');
+  let dateTo = $state('');
+  let selectedYear = $state('');
+  let selectedMonth = $state('');
+  let offset = $state(0);
+  let activeRequest = 0;
 
-  const filteredRows = $derived(previewRows.filter((row) =>
-    (!selectedCategories.length || selectedCategories.includes(row.category))
-    && (!selectedPeople.length || selectedPeople.includes(row.who))
-  ));
-  const filteredDownloadUrl = $derived(datasetId
-    ? buildExportUrl(datasetId, selectedCategories, selectedPeople)
-    : '');
+  function currentFilters(paging = false) {
+    return {
+      categories: [...selectedCategories],
+      who: [...selectedPeople],
+      dateFrom,
+      dateTo,
+      year: selectedYear,
+      month: selectedMonth,
+      ...(paging ? { limit: pageSize, offset } : {}),
+    };
+  }
+
+  const filteredDownloadUrl = $derived(buildExportUrl(currentFilters()));
+
+  async function refreshFilterOptions() {
+    try {
+      const options = await fetchFilterOptions();
+      categoryOptions = options.categories ?? [];
+      whoOptions = options.who ?? [];
+      years = options.years ?? [];
+    } catch (error) {
+      historyError = error instanceof Error ? error.message : 'Unable to load expense filters.';
+    }
+  }
+
+  async function loadHistory() {
+    const requestId = ++activeRequest;
+    isLoadingHistory = true;
+    historyError = '';
+    const filters = currentFilters(true);
+    try {
+      const [page, totals] = await Promise.all([
+        fetchExpenses(filters),
+        fetchSummary(filters),
+      ]);
+      if (requestId !== activeRequest) return;
+      rows = page.items ?? [];
+      totalCount = page.total_count ?? 0;
+      summary = totals;
+    } catch (error) {
+      if (requestId !== activeRequest) return;
+      historyError = error instanceof Error ? error.message : 'Unable to load saved expenses.';
+    } finally {
+      if (requestId === activeRequest) isLoadingHistory = false;
+    }
+  }
+
+  function handleFilterChange(kind = 'categories') {
+    offset = 0;
+    if (kind === 'range') {
+      selectedYear = '';
+      selectedMonth = '';
+    } else if (kind === 'quick') {
+      dateFrom = '';
+      dateTo = '';
+      if (!selectedYear) selectedMonth = '';
+    }
+    loadHistory();
+  }
+
+  function clearFilters() {
+    selectedCategories = [];
+    selectedPeople = [];
+    dateFrom = '';
+    dateTo = '';
+    selectedYear = '';
+    selectedMonth = '';
+    offset = 0;
+    loadHistory();
+  }
 
   async function handleUpload(file) {
     if (!file) {
@@ -35,123 +106,91 @@
 
     isUploading = true;
     uploadError = '';
-    downloadId = null;
-
+    uploadMessage = '';
     try {
-      const payload = await uploadFile(file);
-      datasetId = payload.dataset_id;
-      downloadId = payload.download_id;
-      previewRows = payload.preview;
-      categoryOptions = [...new Set(previewRows.map((row) => row.category).filter(Boolean))].sort();
-      whoOptions = [...new Set(previewRows.map((row) => row.who).filter(Boolean))].sort();
-      selectedCategories = [];
-      selectedPeople = [];
-      summary = null;
-      await loadSummary(payload.dataset_id, [], []);
-    } catch (err) {
-      uploadError = err instanceof Error ? err.message : 'Something went wrong.';
+      const result = await uploadFile(file);
+      hasUploaded = true;
+      uploadMessage = `${result.new_transaction_count ?? 0} new expenses added; ${result.duplicate_count ?? 0} duplicates skipped.`;
+      await refreshFilterOptions();
+      offset = 0;
+      await loadHistory();
+    } catch (error) {
+      uploadError = error instanceof Error ? error.message : 'Something went wrong.';
     } finally {
       isUploading = false;
     }
   }
 
-  async function loadSummary(
-    targetDatasetId = datasetId,
-    categories = selectedCategories,
-    people = selectedPeople,
-  ) {
-    if (!targetDatasetId) return;
-    summaryController?.abort();
-    const requestController = new AbortController();
-    summaryController = requestController;
-    isDashboardLoading = true;
-    dashboardError = '';
+  function previousPage() {
+    offset = Math.max(0, offset - pageSize);
+    loadHistory();
+  }
 
-    try {
-      const payload = await fetchSummary(
-        targetDatasetId,
-        categories,
-        people,
-        requestController.signal,
-      );
-      if (requestController.signal.aborted) return;
-      summary = payload;
-    } catch (err) {
-      if (err instanceof Error && err.name !== 'AbortError') {
-        dashboardError = err.message;
-      }
-    } finally {
-      if (!requestController.signal.aborted) isDashboardLoading = false;
+  function nextPage() {
+    if (offset + pageSize < totalCount) {
+      offset += pageSize;
+      loadHistory();
     }
   }
 
-  function clearFilters() {
-    selectedCategories = [];
-    selectedPeople = [];
-    loadSummary();
-  }
-
-  onDestroy(() => summaryController?.abort());
+  onMount(() => {
+    refreshFilterOptions();
+    loadHistory();
+  });
 </script>
 
 <main class="container app-shell">
-  {#if !datasetId}
-    <section class="welcome" aria-labelledby="welcomeHeading">
+  <section class="welcome" class:welcome-after-upload={hasUploaded} aria-labelledby="welcomeHeading">
+    {#if !hasUploaded}
       <div class="welcome-copy">
-        <p class="eyebrow">A clearer view of your spending</p>
+        <p class="eyebrow">Your household spending ledger</p>
         <h1 id="welcomeHeading">Make sense of your spending.</h1>
         <p class="welcome-lede">
-          Turn a bank statement into a simple picture of where your money goes.
-          Start with a CSV or Excel file.
+          Import a bank statement to add new expenses. Your saved history stays here so you can browse spending over time.
         </p>
-        <ul class="welcome-steps" aria-label="What you can do">
-          <li>
-            <span class="step-number" aria-hidden="true">01</span>
-            <span><strong>Upload a statement</strong><small>CSV, XLS, and XLSX files</small></span>
-          </li>
-          <li>
-            <span class="step-number" aria-hidden="true">02</span>
-            <span><strong>See the big picture</strong><small>Totals and category breakdowns</small></span>
-          </li>
-          <li>
-            <span class="step-number" aria-hidden="true">03</span>
-            <span><strong>Explore the details</strong><small>Filter transactions and export them</small></span>
-          </li>
-        </ul>
       </div>
-      <UploadPanel {isUploading} {uploadError} onupload={handleUpload} />
-    </section>
-  {:else}
-    <section class="results" aria-labelledby="resultsHeading">
-      <header class="results-heading">
-        <div>
-          <p class="eyebrow">Your statement is ready</p>
-          <h1 id="resultsHeading">Your spending, at a glance.</h1>
-          <p>Use the filters to focus on the expenses you want to review.</p>
-        </div>
-        <span class="ready-badge"><span aria-hidden="true">✓</span> Analysis complete</span>
-      </header>
-      <DashboardPanel
-        {categoryOptions}
-        {whoOptions}
-        bind:selectedCategories
-        bind:selectedPeople
-        {summary}
-        isLoading={isDashboardLoading}
-        error={dashboardError}
-        onfilterschange={() => loadSummary()}
-        onclearfilters={clearFilters}
-      />
-      <PreviewPanel
-        rows={filteredRows}
-        {downloadId}
-        {datasetId}
-        {filteredDownloadUrl}
-      />
-      <details class="upload-another">
-        <summary>Analyze another statement</summary>
-        <UploadPanel {isUploading} {uploadError} onupload={handleUpload} />
-      </details>
-    </section>
+    {/if}
+    <UploadPanel {isUploading} {uploadError} onupload={handleUpload} />
+  </section>
+
+  {#if uploadMessage}
+    <p class="success-message" role="status">{uploadMessage}</p>
   {/if}
+
+  <section class="results" aria-labelledby="resultsHeading" aria-busy={isLoadingHistory}>
+    <header class="results-heading">
+      <div>
+        <p class="eyebrow">All imported transactions</p>
+        <h2 id="resultsHeading">Expense history</h2>
+        <p>Filter expenses by category, person, and transaction date.</p>
+      </div>
+    </header>
+    {#if historyError}
+      <p class="error-message" role="alert">{historyError}</p>
+    {/if}
+    <DashboardPanel
+      {categoryOptions}
+      {whoOptions}
+      {years}
+      bind:selectedCategories
+      bind:selectedPeople
+      bind:dateFrom
+      bind:dateTo
+      bind:selectedYear
+      bind:selectedMonth
+      {summary}
+      onclearfilters={clearFilters}
+      onfilterchange={handleFilterChange}
+    />
+    <PreviewPanel
+      {rows}
+      {totalCount}
+      {offset}
+      limit={pageSize}
+      loading={isLoadingHistory}
+      filteredDownloadUrl={filteredDownloadUrl}
+      onprevious={previousPage}
+      onnext={nextPage}
+    />
+  </section>
 </main>
