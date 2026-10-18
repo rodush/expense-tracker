@@ -40,17 +40,17 @@
         onchange={handleFileChange}
       />
     </label>
-    <small id="fileHelp" class="file-help"
-      >Your statement is used to prepare this report.</small
-    >
+    <small id="fileHelp" class="file-help">
+      Your statement is used to prepare this report.
+    </small>
 
     {#if selectedFile}
       <p class="selected-file" role="status">
         <span class="selected-file-check" aria-hidden="true">✓</span>
-        <span
-          ><strong>{selectedFile.name}</strong><small>Ready to analyze</small
-          ></span
-        >
+        <span>
+          <strong>{selectedFile.name}</strong>
+          <small>Ready to analyze</small>
+        </span>
       </p>
     {/if}
 
@@ -61,7 +61,8 @@
       disabled={isUploading}
     >
       {#if isUploading}
-        <span class="button-spinner" aria-hidden="true"></span> Analyzing statement…
+        <span class="button-spinner" aria-hidden="true"></span>
+        Analyzing statement…
       {:else}
         Analyze expenses
         <span aria-hidden="true">→</span>

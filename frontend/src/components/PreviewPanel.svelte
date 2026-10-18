@@ -79,9 +79,10 @@
       <p class="eyebrow">Transaction detail</p>
       <h2 id="transactionsHeading">Expense history</h2>
     </div>
-    <span class="row-count"
-      >{totalCount} {totalCount === 1 ? "expense" : "expenses"}</span
-    >
+    <span class="row-count">
+      {totalCount}
+      {totalCount === 1 ? "expense" : "expenses"}
+    </span>
   </header>
   <nav class="download-actions" aria-label="Export expenses">
     <a
@@ -100,11 +101,10 @@
     </p>
   {:else}
     <details class="transaction-details" open>
-      <summary
-        ><span>Review transactions</span><span class="summary-count"
-          >{rows.length} of {totalCount} rows</span
-        ></summary
-      >
+      <summary>
+        <span>Review transactions</span>
+        <span class="summary-count">{rows.length} of {totalCount} rows</span>
+      </summary>
       <div class="table-scroll">
         <table id="resultsTable">
           <caption>Expenses included in the current report</caption>
@@ -118,21 +118,22 @@
           <thead>
             <tr>
               {#each [["date", "Date"], ["amount", "Amount"], ["who", "Person"], ["category", "Category"], ["description", "Description"]] as [key, label] (key)}
-                <th scope="col"
-                  ><button
+                <th scope="col">
+                  <button
                     class="sort-button"
                     aria-label={`Sort by ${label}`}
                     onclick={() => toggleSort(key)}
-                    >{label}
-                    <span aria-hidden="true"
-                      >{sort.key === key
+                  >
+                    {label}
+                    <span aria-hidden="true">
+                      {sort.key === key
                         ? sort.direction === "asc"
                           ? "↑"
                           : "↓"
-                        : "↕"}</span
-                    ></button
-                  ></th
-                >
+                        : "↕"}
+                    </span>
+                  </button>
+                </th>
               {/each}
             </tr>
           </thead>
@@ -171,8 +172,9 @@
                     );
                   }}
                   onblur={(event) => hideTooltip(event, index)}
-                  >{row.description ?? ""}</td
                 >
+                  {row.description ?? ""}
+                </td>
               </tr>
             {/each}
           </tbody>
@@ -184,18 +186,22 @@
         type="button"
         class="clear-filter-button"
         onclick={onprevious}
-        disabled={offset === 0}>Previous</button
+        disabled={offset === 0}
       >
-      <span
-        >Showing {offset + 1}–{Math.min(offset + limit, totalCount)} of {totalCount}</span
-      >
+        Previous
+      </button>
+      <span>
+        Showing {offset + 1}–{Math.min(offset + limit, totalCount)} of {totalCount}
+      </span>
       <button
         type="button"
         class="clear-filter-button"
         aria-label="Next page"
         onclick={onnext}
-        disabled={offset + limit >= totalCount}>Next page</button
+        disabled={offset + limit >= totalCount}
       >
+        Next page
+      </button>
     </nav>
   {/if}
 </section>

@@ -268,7 +268,9 @@ uv run ty check
 CI runs frontend linting, formatting verification, tests, Svelte diagnostics,
 and the production build for every pull request and for pushes to `master`.
 Run `npm run format` from `frontend/` to apply Prettier formatting. ESLint uses
-the official Svelte plugin with its recommended rules. The test suite does not require a Gemini API key; external
+the official Svelte plugin with its recommended rules. Prettier is configured
+to keep Svelte template text wrapping readable. The test suite does not require
+a Gemini API key; external
 categorization is covered with deterministic fallbacks and mocks.
 
 The release gate also includes API contract tests

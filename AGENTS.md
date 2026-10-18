@@ -108,6 +108,8 @@ npm run build
 ESLint uses the flat configuration in `frontend/eslint.config.js`, including
 the recommended Svelte rules. Prettier uses the Svelte plugin; run
 `npm run format` to fix formatting and `npm run format:check` to verify it.
+The Prettier configuration sets `htmlWhitespaceSensitivity` to `ignore` for
+more readable Svelte template wrapping.
 Keep all frontend quality scripts in `frontend/package.json` and run lint,
 format verification, tests, Svelte diagnostics, and the production build in CI.
 Write or update a focused frontend test before changing behavior (TDD). If a

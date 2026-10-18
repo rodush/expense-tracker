@@ -112,8 +112,10 @@
           !dateTo &&
           !selectedYear &&
           !selectedMonth}
-        onclick={onclearfilters}>Clear filters</button
+        onclick={onclearfilters}
       >
+        Clear filters
+      </button>
     </div>
     <div id="filterForm" class="filter-groups">
       <fieldset class="filter-group">
@@ -152,8 +154,8 @@
     <div class="date-filters">
       <fieldset class="filter-group date-range-group">
         <legend>Date range</legend>
-        <label
-          >From date
+        <label>
+          From date
           <input
             aria-label="From date"
             type="date"
@@ -161,8 +163,8 @@
             oninput={() => onfilterchange?.("range")}
           />
         </label>
-        <label
-          >To date
+        <label>
+          To date
           <input
             aria-label="To date"
             type="date"
@@ -173,8 +175,8 @@
       </fieldset>
       <fieldset class="filter-group quick-date-group">
         <legend>Quick month and year</legend>
-        <label
-          >Year
+        <label>
+          Year
           <select
             aria-label="Year"
             bind:value={selectedYear}
@@ -186,8 +188,8 @@
             {/each}
           </select>
         </label>
-        <label
-          >Month
+        <label>
+          Month
           <select
             aria-label="Month"
             bind:value={selectedMonth}
@@ -196,13 +198,13 @@
           >
             <option value="">All months</option>
             {#each Array.from({ length: 12 }, (_, index) => index + 1) as month (month)}
-              <option value={String(month)}
-                >{new Date(
+              <option value={String(month)}>
+                {new Date(
                   new Date().getFullYear(),
                   month - 1,
                   1,
-                ).toLocaleString(undefined, { month: "long" })}</option
-              >
+                ).toLocaleString(undefined, { month: "long" })}
+              </option>
             {/each}
           </select>
         </label>
@@ -218,9 +220,9 @@
   {#if summary?.expense_count === 0}
     <p id="dashboardEmpty" class="empty-state" role="status">
       <strong>No expenses match these filters.</strong>
-      <span
-        >Try choosing different options or clear the filters to see everything.</span
-      >
+      <span>
+        Try choosing different options or clear the filters to see everything.
+      </span>
     </p>
   {/if}
   {#if summary}
@@ -234,8 +236,9 @@
           </p>
         </article>
         <article class="summary-card">
-          <span class="metric-icon metric-icon-muted" aria-hidden="true">#</span
-          >
+          <span class="metric-icon metric-icon-muted" aria-hidden="true">
+            #
+          </span>
           <p class="metric-label">Transactions</p>
           <p id="expenseCount" class="metric-value">{summary.expense_count}</p>
         </article>
@@ -260,39 +263,40 @@
             <summary>Spending totals by category</summary>
             <div class="table-scroll">
               <table id="categoryTable">
-                <caption class="visually-hidden"
-                  >Spending totals by category</caption
-                >
-                <thead
-                  ><tr>
+                <caption class="visually-hidden">
+                  Spending totals by category
+                </caption>
+                <thead>
+                  <tr>
                     {#each [["name", "Category"], ["amount", "Amount"], ["count", "Count"]] as [key, label] (key)}
-                      <th scope="col"
-                        ><button
+                      <th scope="col">
+                        <button
                           class="sort-button"
                           aria-label={`Sort by ${label}`}
                           onclick={() => {
                             categorySort = toggleSort(categorySort, key);
                           }}
-                          >{label}
-                          <span aria-hidden="true"
-                            >{categorySort.key === key
+                        >
+                          {label}
+                          <span aria-hidden="true">
+                            {categorySort.key === key
                               ? categorySort.direction === "asc"
                                 ? "↑"
                                 : "↓"
-                              : "↕"}</span
-                          ></button
-                        ></th
-                      >
+                              : "↕"}
+                          </span>
+                        </button>
+                      </th>
                     {/each}
-                  </tr></thead
-                >
+                  </tr>
+                </thead>
                 <tbody>
                   {#each sortedCategories as item (item.name)}
-                    <tr
-                      ><th scope="row">{item.name}</th><td
-                        >{formatAmount(item.amount)}</td
-                      ><td>{item.count}</td></tr
-                    >
+                    <tr>
+                      <th scope="row">{item.name}</th>
+                      <td>{formatAmount(item.amount)}</td>
+                      <td>{item.count}</td>
+                    </tr>
                   {/each}
                 </tbody>
               </table>
@@ -310,36 +314,37 @@
           <div class="table-scroll people-table-scroll">
             <table id="whoTable">
               <caption>Spending totals by person</caption>
-              <thead
-                ><tr>
+              <thead>
+                <tr>
                   {#each [["name", "Person"], ["amount", "Amount"], ["count", "Count"]] as [key, label] (key)}
-                    <th scope="col"
-                      ><button
+                    <th scope="col">
+                      <button
                         class="sort-button"
                         aria-label={`Sort by ${label}`}
                         onclick={() => {
                           whoSort = toggleSort(whoSort, key);
                         }}
-                        >{label}
-                        <span aria-hidden="true"
-                          >{whoSort.key === key
+                      >
+                        {label}
+                        <span aria-hidden="true">
+                          {whoSort.key === key
                             ? whoSort.direction === "asc"
                               ? "↑"
                               : "↓"
-                            : "↕"}</span
-                        ></button
-                      ></th
-                    >
+                            : "↕"}
+                        </span>
+                      </button>
+                    </th>
                   {/each}
-                </tr></thead
-              >
+                </tr>
+              </thead>
               <tbody>
                 {#each sortedPeople as item (item.name)}
-                  <tr
-                    ><th scope="row">{item.name}</th><td
-                      >{formatAmount(item.amount)}</td
-                    ><td>{item.count}</td></tr
-                  >
+                  <tr>
+                    <th scope="row">{item.name}</th>
+                    <td>{formatAmount(item.amount)}</td>
+                    <td>{item.count}</td>
+                  </tr>
                 {/each}
               </tbody>
             </table>
