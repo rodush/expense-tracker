@@ -98,6 +98,11 @@ class UploadService:
         if len(raw_content) > MAX_UPLOAD_SIZE_BYTES:
             raise ServiceError(413, "Uploaded file is too large.")
 
+        (
+            dataframe,
+            category_column_added,
+            normalized_rows,
+        ) = await self._process_new_upload(filename, raw_content, file_extension)
         source_hash = hashlib.sha256(raw_content).hexdigest()
         try:
             existing_import = self.dataset_store.find_import(source_hash)
@@ -118,11 +123,6 @@ class UploadService:
                 "dataset_id": existing_import["dataset_id"],
             }
 
-        (
-            dataframe,
-            category_column_added,
-            normalized_rows,
-        ) = await self._process_new_upload(filename, raw_content, file_extension)
         keys = record_keys(normalized_rows)
         try:
             known_keys = self.dataset_store.existing_record_keys(keys)
