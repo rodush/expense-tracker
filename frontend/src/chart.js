@@ -27,7 +27,7 @@ export function createOrUpdateCategoryChart(canvas, items, categoryChartAmounts)
         maintainAspectRatio: false,
         responsive: true,
         plugins: {
-          legend: { position: 'bottom' },
+          legend: { position: 'right' },
           tooltip: {
             callbacks: {
               label: (context) =>

@@ -42,6 +42,9 @@ describe('historical expense dashboard', () => {
     render(App);
 
     expect(screen.getByRole('heading', { name: 'Make sense of your spending.' })).toBeTruthy();
+    expect(screen.getByText('Upload an expense statement').closest('summary')).toBeTruthy();
+    expect(screen.getByText('Upload an expense statement').closest('details').open).toBe(false);
+    await fireEvent.click(screen.getByText('Upload an expense statement'));
     expect(screen.getByRole('region', { name: 'Upload an expense statement' })).toBeTruthy();
     expect(await screen.findByText('<img src=x onerror=alert(1)>')).toBeTruthy();
     expect(screen.getByText(formatTransactionDate(rows[0].date))).toBeTruthy();
@@ -92,11 +95,37 @@ describe('historical expense dashboard', () => {
     expect(tableRows[1].textContent).toContain('<img src=x onerror=alert(1)>');
   });
 
+  it('shows the selected filter count when the filters are collapsed', async () => {
+    mockHistory();
+    render(App);
+    await screen.findByText('<img src=x onerror=alert(1)>');
+
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'Food' }));
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'Ava' }));
+    const filterSummary = screen.getByText('Filter your expenses').closest('summary');
+    await fireEvent.click(filterSummary);
+
+    expect(filterSummary.closest('details').open).toBe(false);
+    expect(screen.getByText('2 selected filters')).toBeTruthy();
+  });
+
+  it('places total spend below the people breakdown and omits the transaction metric card', async () => {
+    mockHistory();
+    render(App);
+    await screen.findByText('<img src=x onerror=alert(1)>');
+
+    const totalSpend = screen.getByText('Total spend').closest('.summary-card');
+    expect(totalSpend.parentElement.classList.contains('people-column')).toBe(true);
+    expect(screen.queryByText('Transactions', { selector: '.metric-label' })).toBeNull();
+    expect(document.querySelector('#expenseCount')).toBeNull();
+  });
+
   it('refreshes the shared history after an upload and reports duplicate counts', async () => {
     mockHistory({ items: [], total_count: 0 });
     uploadFile.mockResolvedValue({ row_count: 5, new_transaction_count: 3, duplicate_count: 2 });
     const { container } = render(App);
 
+    await fireEvent.click(screen.getByText('Upload an expense statement'));
     await fireEvent.change(container.querySelector('#fileInput'), {
       target: { files: [new File(['data'], 'expenses.csv', { type: 'text/csv' })] },
     });
@@ -107,5 +136,6 @@ describe('historical expense dashboard', () => {
     expect(screen.queryByRole('heading', { name: 'Make sense of your spending.' })).toBeNull();
     expect(screen.getAllByRole('region', { name: 'Expense history' })).toHaveLength(2);
     expect(screen.getByRole('checkbox', { name: 'Food' })).toBeTruthy();
+    expect(container.querySelector('.upload-accordion').open).toBe(false);
   });
 });
