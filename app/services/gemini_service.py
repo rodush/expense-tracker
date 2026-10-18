@@ -15,6 +15,9 @@ from google.genai import types as genai_types
 
 from app.config import settings
 from app.services import rule_engine
+from app.services.local_heuristics import (
+    classify_description as _local_heuristic_category,
+)
 
 logger = logging.getLogger("expense_tracker.categorization")
 GEMINI_MODEL = "gemini-2.5-flash"
@@ -47,10 +50,10 @@ def _heuristic_category(
     allowed_categories: tuple[str, ...] | None = None,
     fallback_category: str | None = None,
 ) -> str:
-    return rule_engine.heuristic_category(
+    return _local_heuristic_category(
         description,
-        allowed_categories or settings.allowed_categories,
-        fallback_category or settings.fallback_category,
+        allowed_categories=allowed_categories or settings.allowed_categories,
+        fallback_category=fallback_category or settings.fallback_category,
     )
 
 
