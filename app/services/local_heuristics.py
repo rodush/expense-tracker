@@ -50,7 +50,7 @@ def classify_description(description: str) -> str:
         ),
         (
             ("Alcohol", "Food"),
-            ("liquor", "wine store", "slijterij", "gall & gall", "gall gall", "酒"),
+            ("liquor", "wine store", "slijterij", "gall & gall", "gall gall"),
         ),
         (
             ("Public transport", "Transport"),

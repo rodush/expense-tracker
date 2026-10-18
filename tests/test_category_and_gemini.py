@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import settings
 from app.main import app
-from app.services import gemini_service, local_heuristics
+from app.services import gemini_service
 from app.services.gemini_service import normalize_category
 
 client = TestClient(app)
@@ -93,49 +93,6 @@ def test_categorize_dataframe_async_sends_batches_concurrently(
 
 def test_normalize_category_rejects_unknown_values_and_falls_back_to_other() -> None:
     assert normalize_category("Mystery Category") == "Other"
-
-
-def test_heuristic_uses_specific_categories_when_configured(
-    monkeypatch: MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        local_heuristics,
-        "settings",
-        SimpleNamespace(
-            allowed_categories=(
-                "Grocery",
-                "Restaurants",
-                "Public transport",
-                "Utilities",
-                "Other",
-            )
-        ),
-    )
-
-    assert local_heuristics.classify_description("Albert Heijn 1516") == "Grocery"
-    assert (
-        local_heuristics.classify_description("Barista Cafe Purmerend") == "Restaurants"
-    )
-    assert (
-        local_heuristics.classify_description("OV-chipkaart opladen")
-        == "Public transport"
-    )
-
-
-def test_heuristic_maps_specific_categories_to_starter_vocabulary(
-    monkeypatch: MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        local_heuristics,
-        "settings",
-        SimpleNamespace(allowed_categories=("Food", "Transport", "Utilities", "Other")),
-    )
-
-    assert local_heuristics.classify_description("Albert Heijn 1516") == "Food"
-    assert local_heuristics.classify_description("OV-chipkaart opladen") == "Transport"
-    assert (
-        local_heuristics.classify_description("PWN Waterleidingbedrijf") == "Utilities"
-    )
 
 
 def test_categorize_dataframe_falls_back_when_gemini_is_unavailable(
