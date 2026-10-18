@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const charts = [];
-vi.mock('chart.js/auto', () => ({
+vi.mock("chart.js/auto", () => ({
   default: class MockChart {
     constructor(_canvas, config) {
       this.config = config;
@@ -14,24 +14,27 @@ vi.mock('chart.js/auto', () => ({
   },
 }));
 
-const { createOrUpdateCategoryChart, destroyCategoryChart } = await import('./chart');
+const { createOrUpdateCategoryChart, destroyCategoryChart } =
+  await import("./chart");
 
 beforeEach(() => {
   destroyCategoryChart();
   charts.length = 0;
 });
 
-describe('category chart', () => {
-  it('uses updated category amounts in tooltip callbacks after filtering', () => {
-    const canvas = document.createElement('canvas');
-    createOrUpdateCategoryChart(canvas, [{ name: 'Food', amount: 20 }], [20]);
+describe("category chart", () => {
+  it("uses updated category amounts in tooltip callbacks after filtering", () => {
+    const canvas = document.createElement("canvas");
+    createOrUpdateCategoryChart(canvas, [{ name: "Food", amount: 20 }], [20]);
     const chart = charts[0];
 
-    createOrUpdateCategoryChart(canvas, [{ name: 'Food', amount: 8 }], [8]);
+    createOrUpdateCategoryChart(canvas, [{ name: "Food", amount: 8 }], [8]);
 
-    expect(chart.config.options.plugins.tooltip.callbacks.label({
-      label: 'Food',
-      dataIndex: 0,
-    })).toBe('Food: 8.00');
+    expect(
+      chart.config.options.plugins.tooltip.callbacks.label({
+        label: "Food",
+        dataIndex: 0,
+      }),
+    ).toBe("Food: 8.00");
   });
 });

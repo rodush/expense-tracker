@@ -97,17 +97,22 @@ Run from `frontend/`:
 
 ```sh
 npm ci
+npm run lint
+npm run format:check
+npm run format  # apply formatting fixes
 npm test
 npm run check
 npm run build
 ```
 
-Keep these scripts defined in `frontend/package.json`. Write or update a
-focused frontend test before changing behavior (TDD), then run it, Svelte
-diagnostics/type checks, and the production build. Add the same checks to CI.
-If a command cannot run because of an environment limitation, report that
-clearly and do not imply it passed. Do not use `uv` to validate frontend-only
-changes.
+ESLint uses the flat configuration in `frontend/eslint.config.js`, including
+the recommended Svelte rules. Prettier uses the Svelte plugin; run
+`npm run format` to fix formatting and `npm run format:check` to verify it.
+Keep all frontend quality scripts in `frontend/package.json` and run lint,
+format verification, tests, Svelte diagnostics, and the production build in CI.
+Write or update a focused frontend test before changing behavior (TDD). If a
+command cannot run because of an environment limitation, report that clearly
+and do not imply it passed. Do not use `uv` to validate frontend-only changes.
 
 For changes that touch both stacks, run the relevant Python and frontend
 validation separately, and build the Docker image when packaging or static

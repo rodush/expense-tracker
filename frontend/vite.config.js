@@ -1,29 +1,29 @@
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { defineConfig } from 'vitest/config';
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { defineConfig } from "vitest/config";
 
 const frontendDirectory = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  base: '/static/frontend/',
+  base: "/static/frontend/",
   plugins: [svelte()],
   resolve: {
-    conditions: ['browser'],
+    conditions: ["browser"],
   },
   test: {
-    environment: 'jsdom',
-    include: ['src/**/*.test.js'],
-    pool: 'vmThreads',
+    environment: "jsdom",
+    include: ["src/**/*.test.js"],
+    pool: "vmThreads",
   },
   build: {
-    outDir: resolve(frontendDirectory, '../app/static/frontend'),
+    outDir: resolve(frontendDirectory, "../app/static/frontend"),
     emptyOutDir: true,
     rollupOptions: {
-      input: resolve(frontendDirectory, 'src/main.js'),
+      input: resolve(frontendDirectory, "src/main.js"),
       output: {
-        entryFileNames: 'app.js',
-        assetFileNames: 'app.[ext]',
+        entryFileNames: "app.js",
+        assetFileNames: "app.[ext]",
       },
     },
   },

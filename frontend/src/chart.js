@@ -1,33 +1,41 @@
-import Chart from 'chart.js/auto';
+import Chart from "chart.js/auto";
 
 let categoryChart = null;
 
-export function createOrUpdateCategoryChart(canvas, items, categoryChartAmounts) {
-  const categories = [...new Map(items.map((item) => [item.name, item])).values()];
+export function createOrUpdateCategoryChart(
+  canvas,
+  items,
+  categoryChartAmounts,
+) {
+  const categories = [
+    ...new Map(items.map((item) => [item.name, item])).values(),
+  ];
   const labels = categories.map((item) => item.name);
   const values = categories.map((item) => Math.abs(item.amount));
-  const colors = categories.map((_, index) =>
-    `hsl(${(index * 360) / categories.length} 70% 48%)`
+  const colors = categories.map(
+    (_, index) => `hsl(${(index * 360) / categories.length} 70% 48%)`,
   );
 
   if (!categoryChart && canvas) {
     categoryChart = new Chart(canvas, {
-      type: 'doughnut',
+      type: "doughnut",
       data: {
         labels,
-        datasets: [{
-          data: values,
-          backgroundColor: colors,
-          borderWidth: 2,
-          hoverOffset: 8,
-        }],
+        datasets: [
+          {
+            data: values,
+            backgroundColor: colors,
+            borderWidth: 2,
+            hoverOffset: 8,
+          },
+        ],
       },
       options: {
-        cutout: '62%',
+        cutout: "62%",
         maintainAspectRatio: false,
         responsive: true,
         plugins: {
-          legend: { position: 'bottom' },
+          legend: { position: "bottom" },
           tooltip: {
             callbacks: {
               label: (context) =>
