@@ -5,8 +5,9 @@ import json
 import unicodedata
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
+from numbers import Real
 from typing import Any
 
 import pandas as pd
@@ -14,17 +15,57 @@ import pandas as pd
 from app.services.dataset_store import parse_amount
 
 
-def normalize_transaction_date(value: Any) -> str:
+def normalize_transaction_date(value: Any, date_format: str = "%Y%m%d") -> str:
     """Return the bank's calendar date as ISO-8601 for storage and identity."""
+    if isinstance(value, (date, datetime, pd.Timestamp)):
+        return (
+            value.date().isoformat()
+            if isinstance(value, datetime)
+            else value.isoformat()
+        )
+
+    if isinstance(value, bool) or value is None or pd.isna(value):
+        raise ValueError("date must be a valid transaction date")
+
+    is_numeric_date = isinstance(value, (Real, Decimal))
+    if isinstance(value, str):
+        text = value.strip()
+        is_numeric_date = text.isdecimal()
+    else:
+        text = str(value).strip()
+        if is_numeric_date:
+            try:
+                numeric_value = Decimal(text)
+            except InvalidOperation:
+                raise ValueError("date must be a valid transaction date") from None
+            if (
+                not numeric_value.is_finite()
+                or numeric_value != numeric_value.to_integral_value()
+            ):
+                raise ValueError("date must be a valid transaction date")
+            text = str(int(numeric_value))
+
+    try:
+        return date.fromisoformat(text).isoformat()
+    except ValueError:
+        pass
+
+    try:
+        return date.strptime(text, date_format).isoformat()
+    except ValueError:
+        if is_numeric_date:
+            raise ValueError("date must be a valid transaction date") from None
+
     if isinstance(value, str):
         try:
-            return date.fromisoformat(value.strip()).isoformat()
-        except ValueError:
-            pass
-    parsed = pd.to_datetime(value, dayfirst=True, errors="coerce")
+            parsed = pd.to_datetime(text, dayfirst=True, errors="coerce")
+        except TypeError, ValueError:
+            parsed = pd.NaT
+    else:
+        parsed = pd.to_datetime(value, dayfirst=True, errors="coerce")
     if pd.isna(parsed):
         raise ValueError("date must be a valid transaction date")
-    return date(parsed.year, parsed.month, parsed.day).isoformat()
+    return parsed.date().isoformat()
 
 
 def _stable_value(value: Any) -> Any:
