@@ -9,6 +9,7 @@
   let isUploading = $state(false);
   let uploadError = $state('');
   let uploadMessage = $state('');
+  let hasUploaded = $state(false);
   let historyError = $state('');
   let isLoadingHistory = $state(false);
   let rows = $state([]);
@@ -108,6 +109,7 @@
     uploadMessage = '';
     try {
       const result = await uploadFile(file);
+      hasUploaded = true;
       uploadMessage = `${result.new_transaction_count ?? 0} new expenses added; ${result.duplicate_count ?? 0} duplicates skipped.`;
       await refreshFilterOptions();
       offset = 0;
@@ -138,14 +140,16 @@
 </script>
 
 <main class="container app-shell">
-  <section class="welcome" aria-labelledby="welcomeHeading">
-    <div class="welcome-copy">
-      <p class="eyebrow">Your household spending ledger</p>
-      <h1 id="welcomeHeading">Make sense of your spending.</h1>
-      <p class="welcome-lede">
-        Import a bank statement to add new expenses. Your saved history stays here so you can browse spending over time.
-      </p>
-    </div>
+  <section class="welcome" class:welcome-after-upload={hasUploaded} aria-labelledby="welcomeHeading">
+    {#if !hasUploaded}
+      <div class="welcome-copy">
+        <p class="eyebrow">Your household spending ledger</p>
+        <h1 id="welcomeHeading">Make sense of your spending.</h1>
+        <p class="welcome-lede">
+          Import a bank statement to add new expenses. Your saved history stays here so you can browse spending over time.
+        </p>
+      </div>
+    {/if}
     <UploadPanel {isUploading} {uploadError} onupload={handleUpload} />
   </section>
 

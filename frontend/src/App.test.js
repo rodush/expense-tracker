@@ -77,6 +77,21 @@ describe('historical expense dashboard', () => {
     expect(screen.getByRole('link', { name: /Download filtered CSV/ })).toBeTruthy();
   });
 
+  it('keeps transaction sorting available', async () => {
+    const olderRow = { ...rows[0], date: '2025-01-01', amount: 3, description: 'Older expense' };
+    mockHistory({ items: [rows[0], olderRow], total_count: 2 });
+    render(App);
+    await screen.findByText('<img src=x onerror=alert(1)>');
+
+    const amountSortButtons = screen.getAllByRole('button', { name: 'Sort by Amount' });
+    await fireEvent.click(amountSortButtons[amountSortButtons.length - 1]);
+
+    const tableRows = screen.getByRole('table', { name: 'Expenses included in the current report' })
+      .querySelectorAll('tbody tr');
+    expect(tableRows[0].textContent).toContain('Older expense');
+    expect(tableRows[1].textContent).toContain('<img src=x onerror=alert(1)>');
+  });
+
   it('refreshes the shared history after an upload and reports duplicate counts', async () => {
     mockHistory({ items: [], total_count: 0 });
     uploadFile.mockResolvedValue({ row_count: 5, new_transaction_count: 3, duplicate_count: 2 });
@@ -85,9 +100,12 @@ describe('historical expense dashboard', () => {
     await fireEvent.change(container.querySelector('#fileInput'), {
       target: { files: [new File(['data'], 'expenses.csv', { type: 'text/csv' })] },
     });
-    await fireEvent.click(screen.getByRole('button', { name: 'Import expenses' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Analyze expenses' }));
 
     expect(await screen.findByText(/3 new expenses added; 2 duplicates skipped/)).toBeTruthy();
     await waitFor(() => expect(fetchExpenses.mock.calls.length).toBeGreaterThan(1));
+    expect(screen.queryByRole('heading', { name: 'Make sense of your spending.' })).toBeNull();
+    expect(screen.getAllByRole('region', { name: 'Expense history' })).toHaveLength(2);
+    expect(screen.getByRole('checkbox', { name: 'Food' })).toBeTruthy();
   });
 });
