@@ -155,7 +155,7 @@
         <select aria-label="Month" bind:value={selectedMonth} onchange={() => onfilterchange?.('quick')} disabled={!selectedYear}>
             <option value="">All months</option>
             {#each Array.from({ length: 12 }, (_, index) => index + 1) as month}
-              <option value={String(month)}>{new Date(2000, month - 1).toLocaleString(undefined, { month: 'long' })}</option>
+              <option value={String(month)}>{new Date(new Date().getFullYear(), month - 1, 1).toLocaleString(undefined, { month: 'long' })}</option>
             {/each}
           </select>
         </label>
