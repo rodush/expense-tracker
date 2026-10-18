@@ -13,7 +13,11 @@
   }
 </script>
 
-<section class="upload-card" class:upload-card-embedded={embedded} aria-labelledby="uploadHeading">
+<section
+  class="upload-card"
+  class:upload-card-embedded={embedded}
+  aria-labelledby="uploadHeading"
+>
   {#if !embedded}
     <div class="upload-card-heading">
       <span class="upload-icon" aria-hidden="true">
@@ -37,23 +41,34 @@
         id="fileInput"
         type="file"
         accept=".csv,.xls,.xlsx"
-        aria-describedby={uploadError ? 'uploadError' : 'fileHelp'}
-        aria-invalid={uploadError ? 'true' : undefined}
+        aria-describedby={uploadError ? "uploadError" : "fileHelp"}
+        aria-invalid={uploadError ? "true" : undefined}
         onchange={handleFileChange}
       />
     </label>
-    <small id="fileHelp" class="file-help">Your statement is used to prepare this report.</small>
+    <small id="fileHelp" class="file-help">
+      Your statement is used to prepare this report.
+    </small>
 
     {#if selectedFile}
       <p class="selected-file" role="status">
         <span class="selected-file-check" aria-hidden="true">✓</span>
-        <span><strong>{selectedFile.name}</strong><small>Ready to analyze</small></span>
+        <span>
+          <strong>{selectedFile.name}</strong>
+          <small>Ready to analyze</small>
+        </span>
       </p>
     {/if}
 
-    <button id="uploadButton" class="primary-action" type="submit" disabled={isUploading}>
+    <button
+      id="uploadButton"
+      class="primary-action"
+      type="submit"
+      disabled={isUploading}
+    >
       {#if isUploading}
-        <span class="button-spinner" aria-hidden="true"></span> Analyzing statement…
+        <span class="button-spinner" aria-hidden="true"></span>
+        Analyzing statement…
       {:else}
         Analyze expenses
         <span aria-hidden="true">→</span>

@@ -1,17 +1,23 @@
 <script>
-  import { onMount } from 'svelte';
-  import { uploadFile, fetchExpenses, fetchFilterOptions, fetchSummary, buildExportUrl } from './api';
-  import DashboardPanel from './components/DashboardPanel.svelte';
-  import PreviewPanel from './components/PreviewPanel.svelte';
-  import UploadPanel from './components/UploadPanel.svelte';
+  import { onMount } from "svelte";
+  import {
+    uploadFile,
+    fetchExpenses,
+    fetchFilterOptions,
+    fetchSummary,
+    buildExportUrl,
+  } from "./api";
+  import DashboardPanel from "./components/DashboardPanel.svelte";
+  import PreviewPanel from "./components/PreviewPanel.svelte";
+  import UploadPanel from "./components/UploadPanel.svelte";
 
   const pageSize = 25;
   let isUploading = $state(false);
-  let uploadError = $state('');
-  let uploadMessage = $state('');
+  let uploadError = $state("");
+  let uploadMessage = $state("");
   let hasUploaded = $state(false);
   let uploadAccordion = $state();
-  let historyError = $state('');
+  let historyError = $state("");
   let isLoadingHistory = $state(false);
   let rows = $state([]);
   let totalCount = $state(0);
@@ -21,10 +27,10 @@
   let years = $state([]);
   let selectedCategories = $state([]);
   let selectedPeople = $state([]);
-  let dateFrom = $state('');
-  let dateTo = $state('');
-  let selectedYear = $state('');
-  let selectedMonth = $state('');
+  let dateFrom = $state("");
+  let dateTo = $state("");
+  let selectedYear = $state("");
+  let selectedMonth = $state("");
   let offset = $state(0);
   let activeRequest = 0;
 
@@ -49,14 +55,17 @@
       whoOptions = options.who ?? [];
       years = options.years ?? [];
     } catch (error) {
-      historyError = error instanceof Error ? error.message : 'Unable to load expense filters.';
+      historyError =
+        error instanceof Error
+          ? error.message
+          : "Unable to load expense filters.";
     }
   }
 
   async function loadHistory() {
     const requestId = ++activeRequest;
     isLoadingHistory = true;
-    historyError = '';
+    historyError = "";
     const filters = currentFilters(true);
     try {
       const [page, totals] = await Promise.all([
@@ -69,21 +78,24 @@
       summary = totals;
     } catch (error) {
       if (requestId !== activeRequest) return;
-      historyError = error instanceof Error ? error.message : 'Unable to load saved expenses.';
+      historyError =
+        error instanceof Error
+          ? error.message
+          : "Unable to load saved expenses.";
     } finally {
       if (requestId === activeRequest) isLoadingHistory = false;
     }
   }
 
-  function handleFilterChange(kind = 'categories') {
+  function handleFilterChange(kind = "categories") {
     offset = 0;
-    if (kind === 'range') {
-      selectedYear = '';
-      selectedMonth = '';
-    } else if (kind === 'quick') {
-      dateFrom = '';
-      dateTo = '';
-      if (!selectedYear) selectedMonth = '';
+    if (kind === "range") {
+      selectedYear = "";
+      selectedMonth = "";
+    } else if (kind === "quick") {
+      dateFrom = "";
+      dateTo = "";
+      if (!selectedYear) selectedMonth = "";
     }
     loadHistory();
   }
@@ -91,23 +103,23 @@
   function clearFilters() {
     selectedCategories = [];
     selectedPeople = [];
-    dateFrom = '';
-    dateTo = '';
-    selectedYear = '';
-    selectedMonth = '';
+    dateFrom = "";
+    dateTo = "";
+    selectedYear = "";
+    selectedMonth = "";
     offset = 0;
     loadHistory();
   }
 
   async function handleUpload(file) {
     if (!file) {
-      uploadError = 'Please choose a file first.';
+      uploadError = "Please choose a file first.";
       return;
     }
 
     isUploading = true;
-    uploadError = '';
-    uploadMessage = '';
+    uploadError = "";
+    uploadMessage = "";
     try {
       const result = await uploadFile(file);
       hasUploaded = true;
@@ -117,7 +129,8 @@
       offset = 0;
       await loadHistory();
     } catch (error) {
-      uploadError = error instanceof Error ? error.message : 'Something went wrong.';
+      uploadError =
+        error instanceof Error ? error.message : "Something went wrong.";
     } finally {
       isUploading = false;
     }
@@ -142,13 +155,17 @@
 </script>
 
 <main class="container app-shell">
-  <section class="welcome" aria-labelledby={hasUploaded ? undefined : 'welcomeHeading'}>
+  <section
+    class="welcome"
+    aria-labelledby={hasUploaded ? undefined : "welcomeHeading"}
+  >
     {#if !hasUploaded}
       <div class="welcome-copy">
         <p class="eyebrow">Your household spending ledger</p>
         <h1 id="welcomeHeading">Make sense of your spending.</h1>
         <p class="welcome-lede">
-          Import a bank statement to add new expenses. Your saved history stays here so you can browse spending over time.
+          Import a bank statement to add new expenses. Your saved history stays
+          here so you can browse spending over time.
         </p>
       </div>
     {/if}
@@ -164,7 +181,12 @@
           <span id="uploadHeading">Upload an expense statement</span>
         </span>
       </summary>
-      <UploadPanel embedded {isUploading} {uploadError} onupload={handleUpload} />
+      <UploadPanel
+        embedded
+        {isUploading}
+        {uploadError}
+        onupload={handleUpload}
+      />
     </details>
   </section>
 
@@ -172,7 +194,11 @@
     <p class="success-message" role="status">{uploadMessage}</p>
   {/if}
 
-  <section class="results" aria-labelledby="resultsHeading" aria-busy={isLoadingHistory}>
+  <section
+    class="results"
+    aria-labelledby="resultsHeading"
+    aria-busy={isLoadingHistory}
+  >
     <header class="results-heading">
       <div>
         <p class="eyebrow">All imported transactions</p>
@@ -203,7 +229,7 @@
       {offset}
       limit={pageSize}
       loading={isLoadingHistory}
-      filteredDownloadUrl={filteredDownloadUrl}
+      {filteredDownloadUrl}
       onprevious={previousPage}
       onnext={nextPage}
     />

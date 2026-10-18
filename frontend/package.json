@@ -8,16 +8,26 @@
   "scripts": {
     "build": "vite build",
     "check": "svelte-check --tsconfig ./jsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint .",
+    "format": "prettier --write \"src/**/*.{js,svelte,css}\" eslint.config.js package.json jsconfig.json vite.config.js .prettierrc.json",
+    "format:check": "prettier --check \"src/**/*.{js,svelte,css}\" eslint.config.js package.json jsconfig.json vite.config.js .prettierrc.json"
   },
   "dependencies": {
     "chart.js": "4.5.1",
     "svelte": "5.57.2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@testing-library/svelte": "5.4.2",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-svelte": "^3.23.1",
+    "globals": "^17.13.0",
     "jsdom": "30.1.2",
+    "prettier": "^3.9.10",
+    "prettier-plugin-svelte": "^4.1.1",
     "svelte-check": "4.7.6",
     "typescript": "6.0.3",
     "vite": "8.3.4",

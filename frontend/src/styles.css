@@ -23,7 +23,11 @@ body {
   min-height: 100vh;
   background:
     radial-gradient(ellipse at 12% 12%, rgb(29 117 92 / 8%), transparent 38%),
-    radial-gradient(ellipse at 92% 82%, rgb(220 230 225 / 68%), transparent 42%),
+    radial-gradient(
+      ellipse at 92% 82%,
+      rgb(220 230 225 / 68%),
+      transparent 42%
+    ),
     var(--canvas);
   color: var(--ink);
 }
@@ -88,7 +92,7 @@ body > header.site-header {
   height: 0.5rem;
   border-radius: 50%;
   background: var(--green);
-  content: '';
+  content: "";
 }
 
 .app-shell.container {
@@ -222,13 +226,13 @@ body > header.site-header {
 .upload-accordion-summary::after {
   margin-left: auto;
   color: var(--green-dark);
-  content: '+';
+  content: "+";
   font-size: 1.5rem;
   line-height: 1;
 }
 
 .upload-accordion[open] > .upload-accordion-summary::after {
-  content: '−';
+  content: "−";
 }
 
 .upload-accordion-title {
@@ -317,7 +321,7 @@ body > header.site-header {
   font-size: 0.78rem;
 }
 
-.file-picker input[type='file'] {
+.file-picker input[type="file"] {
   width: 100%;
   margin: 0.35rem 0 0;
   padding: 0;
@@ -326,7 +330,7 @@ body > header.site-header {
   font-size: 0.8rem;
 }
 
-.file-picker input[type='file']::file-selector-button {
+.file-picker input[type="file"]::file-selector-button {
   margin-right: 0.65rem;
   padding: 0.5rem 0.8rem;
   border: 1px solid var(--line);
@@ -418,7 +422,9 @@ body > header.site-header {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error-message {
@@ -523,7 +529,7 @@ body > header.site-header {
 .filter-card-summary::after {
   margin-left: 0.15rem;
   color: var(--green-dark);
-  content: '+';
+  content: "+";
   font-size: 1.2rem;
   line-height: 1;
 }
@@ -533,7 +539,7 @@ body > header.site-header {
 }
 
 .filter-card[open] > .filter-card-summary::after {
-  content: '−';
+  content: "−";
 }
 
 .filter-card-title {
@@ -637,7 +643,7 @@ body > header.site-header {
   color: var(--green-dark);
 }
 
-.filter-options input[type='checkbox'] {
+.filter-options input[type="checkbox"] {
   width: 0.95rem;
   height: 0.95rem;
   margin: 0;
