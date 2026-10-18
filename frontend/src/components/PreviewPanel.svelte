@@ -1,5 +1,6 @@
 <script>
   import { tick } from 'svelte';
+  import { formatTransactionDate } from '../date-format';
   import { calculateTooltipPosition } from '../tooltip-position';
 
   let { rows, filteredDownloadUrl, totalCount = 0, offset = 0, limit = 25, loading = false, onprevious, onnext } = $props();
@@ -92,7 +93,7 @@
         <tbody>
           {#each sortedRows as row, index}
             <tr>
-              <td>{row.date ?? ''}</td>
+              <td>{formatTransactionDate(row.date)}</td>
               <td>{formatAmount(row.amount ?? 0)}</td>
               <td>{row.who ?? ''}</td>
               <td>{row.category ?? ''}</td>

@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/sv
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App.svelte';
 import { buildExportUrl, fetchExpenses, fetchFilterOptions, fetchSummary, uploadFile } from './api';
+import { formatTransactionDate } from './date-format';
 
 vi.mock('./api', () => ({
   uploadFile: vi.fn(),
@@ -43,6 +44,8 @@ describe('historical expense dashboard', () => {
     expect(screen.getByRole('heading', { name: 'Make sense of your spending.' })).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Upload an expense statement' })).toBeTruthy();
     expect(await screen.findByText('<img src=x onerror=alert(1)>')).toBeTruthy();
+    expect(screen.getByText(formatTransactionDate(rows[0].date))).toBeTruthy();
+    expect(screen.queryByText(rows[0].date)).toBeNull();
     expect(fetchFilterOptions).toHaveBeenCalledOnce();
     expect(fetchExpenses).toHaveBeenCalledWith(expect.objectContaining({ offset: 0, limit: 25 }));
     expect(fetchSummary).toHaveBeenCalled();
