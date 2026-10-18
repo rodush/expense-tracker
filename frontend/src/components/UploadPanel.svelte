@@ -1,5 +1,5 @@
 <script>
-  let { isUploading, uploadError, onupload } = $props();
+  let { isUploading, uploadError, onupload, embedded = false } = $props();
   let fileInput = $state();
   let selectedFile = $state(null);
 
@@ -13,18 +13,24 @@
   }
 </script>
 
-<section class="upload-card" aria-labelledby="uploadHeading">
-  <div class="upload-card-heading">
-    <span class="upload-icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none">
-        <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v5h14v-5" />
-      </svg>
-    </span>
-    <div>
-      <p class="eyebrow">Start here</p>
-      <h2 id="uploadHeading">Upload an expense statement</h2>
+<section
+  class="upload-card"
+  class:upload-card-embedded={embedded}
+  aria-labelledby="uploadHeading"
+>
+  {#if !embedded}
+    <div class="upload-card-heading">
+      <span class="upload-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v5h14v-5" />
+        </svg>
+      </span>
+      <div>
+        <p class="eyebrow">Start here</p>
+        <h2 id="uploadHeading">Upload an expense statement</h2>
+      </div>
     </div>
-  </div>
+  {/if}
 
   <form onsubmit={submitUpload}>
     <label class="file-picker" for="fileInput">

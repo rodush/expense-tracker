@@ -16,6 +16,7 @@
   let uploadError = $state("");
   let uploadMessage = $state("");
   let hasUploaded = $state(false);
+  let uploadAccordion = $state();
   let historyError = $state("");
   let isLoadingHistory = $state(false);
   let rows = $state([]);
@@ -122,6 +123,7 @@
     try {
       const result = await uploadFile(file);
       hasUploaded = true;
+      if (uploadAccordion) uploadAccordion.open = false;
       uploadMessage = `${result.new_transaction_count ?? 0} new expenses added; ${result.duplicate_count ?? 0} duplicates skipped.`;
       await refreshFilterOptions();
       offset = 0;
@@ -155,8 +157,7 @@
 <main class="container app-shell">
   <section
     class="welcome"
-    class:welcome-after-upload={hasUploaded}
-    aria-labelledby="welcomeHeading"
+    aria-labelledby={hasUploaded ? undefined : "welcomeHeading"}
   >
     {#if !hasUploaded}
       <div class="welcome-copy">
@@ -168,7 +169,25 @@
         </p>
       </div>
     {/if}
-    <UploadPanel {isUploading} {uploadError} onupload={handleUpload} />
+    <details bind:this={uploadAccordion} class="upload-accordion">
+      <summary class="upload-accordion-summary">
+        <span class="upload-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v5h14v-5" />
+          </svg>
+        </span>
+        <span class="upload-accordion-title">
+          <span class="eyebrow">Start here</span>
+          <span id="uploadHeading">Upload an expense statement</span>
+        </span>
+      </summary>
+      <UploadPanel
+        embedded
+        {isUploading}
+        {uploadError}
+        onupload={handleUpload}
+      />
+    </details>
   </section>
 
   {#if uploadMessage}
