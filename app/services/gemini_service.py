@@ -14,6 +14,7 @@ from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 
 from app.config import settings
+from app.services.local_heuristics import classify_description as _heuristic_category
 
 logger = logging.getLogger("expense_tracker.categorization")
 GEMINI_MODEL = "gemini-2.5-flash"
@@ -39,62 +40,6 @@ def determine_who_from_description(description: str) -> str:
     if "kaartnummer: **5006" in description_lower:
         return "Oksana"
     return "General"
-
-
-def _heuristic_category(description: str) -> str:
-    description_lower = description.lower()
-
-    category_keywords = {
-        "Food": [
-            "coffee",
-            "restaurant",
-            "cafe",
-            "food",
-            "lunch",
-            "dinner",
-            "grocer",
-            "grocery",
-            "bakery",
-        ],
-        "Transport": [
-            "uber",
-            "lyft",
-            "taxi",
-            "train",
-            "metro",
-            "fuel",
-            "petrol",
-            "parking",
-            "bus",
-            "rail",
-        ],
-        "Utilities": [
-            "electricity",
-            "water",
-            "gas",
-            "internet",
-            "phone",
-            "utility",
-            "mobile",
-            "bill",
-        ],
-        "Shopping": [
-            "amazon",
-            "shop",
-            "store",
-            "market",
-            "retail",
-            "purchase",
-            "clothes",
-            "electronics",
-        ],
-    }
-
-    for category, keywords in category_keywords.items():
-        if any(keyword in description_lower for keyword in keywords):
-            return category
-
-    return "Other"
 
 
 def _batch_response_schema() -> dict[str, Any]:
