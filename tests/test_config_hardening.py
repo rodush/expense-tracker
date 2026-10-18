@@ -41,3 +41,20 @@ def test_settings_rejects_fallback_missing_from_category_list(
 
     with pytest.raises(ValueError, match="Fallback category"):
         config.Settings()
+
+
+def test_transaction_date_format_defaults_to_abn_format(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("TRANSACTION_DATE_FORMAT", raising=False)
+
+    assert config.Settings().transaction_date_format == "%Y%m%d"
+
+
+def test_settings_rejects_invalid_transaction_date_format(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TRANSACTION_DATE_FORMAT", "%Y-%Q")
+
+    with pytest.raises(ValueError, match="TRANSACTION_DATE_FORMAT"):
+        config.Settings()

@@ -70,11 +70,13 @@ class UploadService:
         categorize: Categorizer,
         determine_who: WhoResolver,
         downloads_dir: Path,
+        transaction_date_format: str = "%Y%m%d",
     ) -> None:
         self.dataset_store = dataset_store
         self.categorize = categorize
         self.determine_who = determine_who
         self.downloads_dir = downloads_dir
+        self.transaction_date_format = transaction_date_format
 
     async def process_upload(
         self, filename: str | None, raw_content: bytes
@@ -240,7 +242,11 @@ class UploadService:
             )
 
         try:
-            dataframe["date"] = dataframe["date"].map(normalize_transaction_date)
+            dataframe["date"] = dataframe["date"].map(
+                lambda value: normalize_transaction_date(
+                    value, self.transaction_date_format
+                )
+            )
             parsed_amounts = dataframe["amount"].map(parse_amount)
         except (TypeError, ValueError) as exc:
             logger.warning(

@@ -203,6 +203,7 @@ Create a `.env` file (`cp .env.example .env`) or export the following variables:
 export GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 export CATEGORIES=Food,Transport,Utilities,Shopping,Other
 export FALLBACK_CATEGORY=Other
+export TRANSACTION_DATE_FORMAT=%Y%m%d
 export WHO_RULES='[{"contains":"card ending 1234","who":"Alex"}]'
 export WHO_UNMATCHED_LABEL=General
 export DATABASE_URL=sqlite:///./expense-tracker.db
@@ -224,6 +225,9 @@ on the persisted configuration model after authentication is introduced.
 
 The category list is read from `CATEGORIES` and the fallback from
 `FALLBACK_CATEGORY`; the fallback must be one of the configured categories.
+`TRANSACTION_DATE_FORMAT` uses Python `strptime` directives and defaults to
+`%Y%m%d`, matching the ABN AMRO export's `YYYYMMDD` date values. For another
+bank format, configure its corresponding format (for example `%d-%m-%Y`).
 `WHO_RULES` is a JSON array of literal, case-insensitive substring rules in
 first-match order. Each rule contains exactly `contains` and `who`, for example:
 

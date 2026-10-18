@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from datetime import date
 
 from dotenv import load_dotenv
 
@@ -41,6 +42,9 @@ class Settings:
             "DATABASE_URL", "sqlite:///./expense-tracker.db"
         )
     )
+    transaction_date_format: str = field(
+        default_factory=lambda: os.getenv("TRANSACTION_DATE_FORMAT", "%Y%m%d").strip()
+    )
     allowed_categories: tuple[str, ...] = field(
         default_factory=lambda: _parse_categories(
             os.getenv("CATEGORIES", "Food,Transport,Utilities,Shopping,Other")
@@ -71,6 +75,20 @@ class Settings:
             raise ValueError("LOG_FORMAT must be either json or text")
         if not self.database_url.strip():
             raise ValueError("DATABASE_URL must not be empty")
+        sample_date = date(2000, 2, 3)
+        try:
+            formatted_sample = sample_date.strftime(self.transaction_date_format)
+            parsed_sample = date.strptime(
+                formatted_sample, self.transaction_date_format
+            )
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError(
+                "TRANSACTION_DATE_FORMAT must be a valid date format including year, month, and day"
+            ) from exc
+        if parsed_sample != sample_date:
+            raise ValueError(
+                "TRANSACTION_DATE_FORMAT must include year, month, and day"
+            )
         validate_category_configuration(self.allowed_categories, self.fallback_category)
         if not self.unmatched_who:
             raise ValueError("WHO_UNMATCHED_LABEL must not be empty")

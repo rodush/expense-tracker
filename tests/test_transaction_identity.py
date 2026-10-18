@@ -8,6 +8,16 @@ def test_normalizes_iso_and_dutch_dates_without_swapping_day_and_month() -> None
     assert normalize_transaction_date("01-07-2026") == "2026-07-01"
 
 
+def test_normalizes_numeric_yyyymmdd_values() -> None:
+    assert normalize_transaction_date(20260701) == "2026-07-01"
+    assert normalize_transaction_date(20260701.0) == "2026-07-01"
+    assert normalize_transaction_date("20260701") == "2026-07-01"
+
+
+def test_normalizes_dates_with_a_configured_format() -> None:
+    assert normalize_transaction_date("01/07/2026", "%d/%m/%Y") == "2026-07-01"
+
+
 def test_record_keys_ignore_derived_fields_and_preserve_repeated_rows() -> None:
     row = {
         "date": "2026-07-01",

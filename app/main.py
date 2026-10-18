@@ -100,6 +100,7 @@ def create_app(
         categorize=categorizer,
         determine_who=who_resolver,
         downloads_dir=downloads_dir,
+        transaction_date_format=app_settings.transaction_date_format,
     )
     application.state.dataset_service = DatasetService(
         dataset_store=service_store,

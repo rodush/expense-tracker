@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sys
 from pathlib import Path
 from typing import Any
@@ -94,6 +95,26 @@ def test_upload_normalizes_dutch_bank_column_names(client) -> None:
     assert payload["preview"][0]["date"] == "2026-07-01"
     assert payload["preview"][0]["amount"] == 15.5
     assert payload["preview"][0]["description"] == "PAS543 Coffee Shop"
+
+
+def test_upload_uses_configured_transaction_date_format() -> None:
+    configured_service = UploadService(
+        dataset_store=DatasetStore(),
+        categorize=_categorize,
+        determine_who=lambda _description: "General",
+        downloads_dir=Path.cwd(),
+        transaction_date_format="%d/%m/%Y",
+    )
+
+    _, _, normalized_rows = asyncio.run(
+        configured_service._process_new_upload(
+            "expenses.csv",
+            b"date,amount,description\n01/07/2026,-15.50,Coffee\n",
+            ".csv",
+        )
+    )
+
+    assert normalized_rows[0]["date"] == "2026-07-01"
 
 
 def test_upload_filters_credits_before_categorization_and_uses_absolute_debits(
