@@ -14,7 +14,10 @@ from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 
 from app.config import settings
-from app.services.local_heuristics import classify_description as _heuristic_category
+from app.services import rule_engine
+from app.services.local_heuristics import (
+    classify_description as _local_heuristic_category,
+)
 
 logger = logging.getLogger("expense_tracker.categorization")
 GEMINI_MODEL = "gemini-2.5-flash"
@@ -24,22 +27,34 @@ GEMINI_MAX_RETRIES = 2
 GEMINI_RETRY_DELAY_SECONDS = 0.1
 
 
-def normalize_category(raw_category: str) -> str:
-    candidate = str(raw_category or "").strip()
-    if candidate in settings.allowed_categories:
-        return candidate
-    return "Other"
+def normalize_category(
+    raw_category: str,
+    allowed_categories: tuple[str, ...] | None = None,
+    fallback_category: str | None = None,
+) -> str:
+    return rule_engine.normalize_category(
+        raw_category,
+        allowed_categories or settings.allowed_categories,
+        fallback_category or settings.fallback_category,
+    )
 
 
 def determine_who_from_description(description: str) -> str:
-    description_text = str(description or "").strip()
-    description_lower = description_text.lower()
+    return rule_engine.determine_who(
+        description, settings.who_rules, settings.unmatched_who
+    )
 
-    if "pas543" in description_lower:
-        return "Roman"
-    if "kaartnummer: **5006" in description_lower:
-        return "Oksana"
-    return "General"
+
+def _heuristic_category(
+    description: str,
+    allowed_categories: tuple[str, ...] | None = None,
+    fallback_category: str | None = None,
+) -> str:
+    return _local_heuristic_category(
+        description,
+        allowed_categories=allowed_categories or settings.allowed_categories,
+        fallback_category=fallback_category or settings.fallback_category,
+    )
 
 
 def _batch_response_schema() -> dict[str, Any]:
@@ -56,18 +71,26 @@ def _batch_response_schema() -> dict[str, Any]:
     }
 
 
-def _batch_system_instruction() -> str:
+def _batch_system_instruction(
+    allowed_categories: tuple[str, ...] | None = None,
+) -> str:
     return (
         "You are a deterministic expense categorization assistant. "
         "Use the system categories exactly as provided. "
         "Do not invent extra categories. "
         "Return only valid JSON matching the required schema. "
-        f"Supported categories: {', '.join(settings.allowed_categories)}"
+        "Supported categories: "
+        f"{', '.join(allowed_categories or settings.allowed_categories)}"
     )
 
 
-def _call_gemini_batch(batch: list[dict[str, Any]]) -> dict[int, str] | None:
-    api_key = os.getenv("GEMINI_API_KEY")
+def _call_gemini_batch(
+    batch: list[dict[str, Any]],
+    allowed_categories: tuple[str, ...] | None = None,
+    fallback_category: str | None = None,
+    api_key: str | None = None,
+) -> dict[int, str] | None:
+    api_key = api_key or settings.gemini_api_key or os.getenv("GEMINI_API_KEY")
     if not api_key:
         return None
 
@@ -81,7 +104,7 @@ def _call_gemini_batch(batch: list[dict[str, Any]]) -> dict[int, str] | None:
         temperature=0.0,
         response_mime_type="application/json",
         response_schema=_batch_response_schema(),
-        system_instruction=_batch_system_instruction(),
+        system_instruction=_batch_system_instruction(allowed_categories),
     )
 
     prompt_payload = json.dumps(batch, ensure_ascii=False)
@@ -112,14 +135,22 @@ def _call_gemini_batch(batch: list[dict[str, Any]]) -> dict[int, str] | None:
         record_index = item.get("record_index")
         category = item.get("category")
         if isinstance(record_index, int) and isinstance(category, str):
-            category_by_index[record_index] = normalize_category(category)
+            category_by_index[record_index] = normalize_category(
+                category, allowed_categories, fallback_category
+            )
 
     return category_by_index or None
 
 
 def _classify_batch(
-    records: list[Mapping[str, Any]], start_index: int
+    records: list[Mapping[str, Any]],
+    start_index: int,
+    allowed_categories: tuple[str, ...] | None = None,
+    fallback_category: str | None = None,
+    api_key: str | None = None,
 ) -> dict[int, str]:
+    active_categories = allowed_categories or settings.allowed_categories
+    active_fallback = fallback_category or settings.fallback_category
     batch_payload: list[dict[str, Any]] = [
         {
             "record_index": start_index + offset,
@@ -132,7 +163,9 @@ def _classify_batch(
     for offset, record in enumerate(records):
         description = str(record.get("description", "") or "").strip()
         fallback_map[start_index + offset] = normalize_category(
-            _heuristic_category(description)
+            _heuristic_category(description, active_categories, active_fallback),
+            active_categories,
+            active_fallback,
         )
 
     if not batch_payload:
@@ -141,7 +174,9 @@ def _classify_batch(
     categorized_by_index = None
     for attempt in range(GEMINI_MAX_RETRIES + 1):
         try:
-            categorized_by_index = _call_gemini_batch(batch_payload)
+            categorized_by_index = _call_gemini_batch(
+                batch_payload, active_categories, active_fallback, api_key
+            )
             break
         except (
             ConnectionError,
@@ -171,16 +206,26 @@ def _classify_batch(
     return fallback_map
 
 
-def classify_description(description: str) -> str:
+def classify_description(
+    description: str,
+    allowed_categories: tuple[str, ...] | None = None,
+    fallback_category: str | None = None,
+) -> str:
     if not description or not str(description).strip():
-        return "Other"
+        return fallback_category or settings.fallback_category
 
-    return normalize_category(_heuristic_category(description))
+    return normalize_category(
+        _heuristic_category(description, allowed_categories, fallback_category),
+        allowed_categories,
+        fallback_category,
+    )
 
 
 def _merge_categorized_batches(
     records: list[Mapping[str, Any]],
     batch_results: list[dict[int, str]],
+    allowed_categories: tuple[str, ...] | None = None,
+    fallback_category: str | None = None,
 ) -> list[dict[str, Any]]:
     categorized_rows: list[dict[str, Any]] = []
 
@@ -194,7 +239,13 @@ def _merge_categorized_batches(
             normalized_row["category"] = category_by_index.get(
                 record_index,
                 normalize_category(
-                    _heuristic_category(str(row.get("description", "") or "").strip())
+                    _heuristic_category(
+                        str(row.get("description", "") or "").strip(),
+                        allowed_categories,
+                        fallback_category,
+                    ),
+                    allowed_categories,
+                    fallback_category,
                 ),
             )
             categorized_rows.append(normalized_row)
@@ -203,11 +254,20 @@ def _merge_categorized_batches(
 
 
 def _fallback_batch(
-    records: list[Mapping[str, Any]], start_index: int
+    records: list[Mapping[str, Any]],
+    start_index: int,
+    allowed_categories: tuple[str, ...] | None = None,
+    fallback_category: str | None = None,
 ) -> dict[int, str]:
     return {
         start_index + offset: normalize_category(
-            _heuristic_category(str(record.get("description", "") or "").strip())
+            _heuristic_category(
+                str(record.get("description", "") or "").strip(),
+                allowed_categories,
+                fallback_category,
+            ),
+            allowed_categories,
+            fallback_category,
         )
         for offset, record in enumerate(records)
     }
@@ -215,7 +275,13 @@ def _fallback_batch(
 
 async def categorize_dataframe_async(
     rows: Iterable[Mapping[str, Any]],
+    *,
+    allowed_categories: tuple[str, ...] | None = None,
+    fallback_category: str | None = None,
+    api_key: str | None = None,
 ) -> list[dict[str, Any]]:
+    active_categories = allowed_categories or settings.allowed_categories
+    active_fallback = fallback_category or settings.fallback_category
     records = list(rows)
     batches = [
         (records[start_index : start_index + BATCH_SIZE], start_index)
@@ -227,17 +293,41 @@ async def categorize_dataframe_async(
     ) -> dict[int, str]:
         try:
             return await asyncio.wait_for(
-                asyncio.to_thread(_classify_batch, chunk, start_index),
+                asyncio.to_thread(
+                    _classify_batch,
+                    chunk,
+                    start_index,
+                    active_categories,
+                    active_fallback,
+                    api_key,
+                ),
                 timeout=GEMINI_TIMEOUT_SECONDS * (GEMINI_MAX_RETRIES + 1),
             )
         except TimeoutError:
-            return _fallback_batch(chunk, start_index)
+            return _fallback_batch(
+                chunk, start_index, active_categories, active_fallback
+            )
 
     batch_results = await asyncio.gather(
         *(classify_with_timeout(chunk, start_index) for chunk, start_index in batches)
     )
-    return _merge_categorized_batches(records, list(batch_results))
+    return _merge_categorized_batches(
+        records, list(batch_results), active_categories, active_fallback
+    )
 
 
-def categorize_dataframe(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    return asyncio.run(categorize_dataframe_async(rows))
+def categorize_dataframe(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    allowed_categories: tuple[str, ...] | None = None,
+    fallback_category: str | None = None,
+    api_key: str | None = None,
+) -> list[dict[str, Any]]:
+    return asyncio.run(
+        categorize_dataframe_async(
+            rows,
+            allowed_categories=allowed_categories,
+            fallback_category=fallback_category,
+            api_key=api_key,
+        )
+    )

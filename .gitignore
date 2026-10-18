@@ -3,6 +3,8 @@ __pycache__/
 .env
 .venv/
 .tmp
+*.db
+*.sqlite3
 .worktrees/
 node_modules/
 app/static/frontend/

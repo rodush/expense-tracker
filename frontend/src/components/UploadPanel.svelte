@@ -40,7 +40,7 @@
         onchange={handleFileChange}
       />
     </label>
-    <small id="fileHelp" class="file-help">Your statement is used to prepare this report.</small>
+    <small id="fileHelp" class="file-help">New expenses are added to your saved history; duplicate transactions are skipped.</small>
 
     {#if selectedFile}
       <p class="selected-file" role="status">
@@ -53,7 +53,7 @@
       {#if isUploading}
         <span class="button-spinner" aria-hidden="true"></span> Analyzing statement…
       {:else}
-        Analyze expenses
+        Import expenses
         <span aria-hidden="true">→</span>
       {/if}
     </button>

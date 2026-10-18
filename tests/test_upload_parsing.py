@@ -10,10 +10,28 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.dependencies import get_upload_service
-from app.main import app
+from app.main import create_app
+from app.services.dataset_store import DatasetStore
 from app.services.upload_service import MAX_UPLOAD_SIZE_BYTES, UploadService
 
-client = TestClient(app)
+
+async def _categorize(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [{**row, "category": "Food"} for row in rows]
+
+
+test_store = DatasetStore()
+app = create_app(data_store=test_store, categorizer=_categorize)
+
+
+@pytest.fixture
+def client():
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+@pytest.fixture(autouse=True)
+def clear_test_store() -> None:
+    test_store.clear()
 
 
 def _override_upload_service(
@@ -24,7 +42,6 @@ def _override_upload_service(
     configured_service: UploadService = app.state.upload_service
     service = UploadService(
         dataset_store=configured_service.dataset_store,
-        upload_cache=configured_service.upload_cache,
         categorize=categorize or configured_service.categorize,
         determine_who=configured_service.determine_who,
         downloads_dir=downloads_dir or configured_service.downloads_dir,
@@ -33,7 +50,7 @@ def _override_upload_service(
     return service
 
 
-def test_upload_accepts_csv_and_adds_category_column() -> None:
+def test_upload_accepts_csv_and_adds_category_column(client) -> None:
     csv_content = (
         "date,amount,description\n"
         "2026-07-01,-15.50,PAS543 Coffee Shop\n"
@@ -60,7 +77,7 @@ def test_upload_accepts_csv_and_adds_category_column() -> None:
     assert payload["preview"][1]["who"] == "Oksana"
 
 
-def test_upload_normalizes_dutch_bank_column_names() -> None:
+def test_upload_normalizes_dutch_bank_column_names(client) -> None:
     csv_content = (
         "Transactiedatum,Transactiebedrag,Omschrijving\n"
         "2026-07-01,-15.50,PAS543 Coffee Shop\n"
@@ -80,7 +97,7 @@ def test_upload_normalizes_dutch_bank_column_names() -> None:
 
 
 def test_upload_filters_credits_before_categorization_and_uses_absolute_debits(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, client
 ) -> None:
     categorized_input: list[dict[str, Any]] = []
 
@@ -116,7 +133,7 @@ def test_upload_filters_credits_before_categorization_and_uses_absolute_debits(
 
 
 def test_reuploading_identical_input_reuses_processed_data(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, client
 ) -> None:
     categorized_batches: list[list[dict[str, Any]]] = []
 
@@ -144,11 +161,13 @@ def test_reuploading_identical_input_reuses_processed_data(
     second_payload = second_response.json()
     assert len(categorized_batches) == 1
     assert first_payload["preview"] == second_payload["preview"]
-    assert first_payload["dataset_id"] != second_payload["dataset_id"]
+    assert first_payload["dataset_id"] == second_payload["dataset_id"]
+    assert second_payload["new_transaction_count"] == 0
+    assert second_payload["duplicate_count"] == 1
     assert client.get(f"/download/{second_payload['download_id']}").status_code == 200
 
 
-def test_full_download_remains_available_as_the_categorized_csv() -> None:
+def test_full_download_remains_available_as_the_categorized_csv(client) -> None:
     response = client.post(
         "/upload",
         files={
@@ -174,7 +193,7 @@ def test_full_download_remains_available_as_the_categorized_csv() -> None:
     ) in download.text
 
 
-def test_upload_rejects_unsupported_file_type() -> None:
+def test_upload_rejects_unsupported_file_type(client) -> None:
     response = client.post(
         "/upload",
         files={"file": ("expenses.txt", b"not a spreadsheet", "text/plain")},
@@ -184,7 +203,7 @@ def test_upload_rejects_unsupported_file_type() -> None:
     assert "unsupported" in response.json()["detail"].lower()
 
 
-def test_upload_rejects_path_traversal_filename() -> None:
+def test_upload_rejects_path_traversal_filename(client) -> None:
     response = client.post(
         "/upload",
         files={
@@ -201,7 +220,7 @@ def test_upload_rejects_path_traversal_filename() -> None:
 
 
 def test_upload_returns_retryable_error_when_output_cannot_be_saved(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, client
 ) -> None:
     output_path = tmp_path / "not-a-directory"
     output_path.write_text("blocking path", encoding="utf-8")
@@ -222,7 +241,7 @@ def test_upload_returns_retryable_error_when_output_cannot_be_saved(
     assert "retry" in response.json()["detail"].lower()
 
 
-def test_upload_rejects_malformed_spreadsheet_content() -> None:
+def test_upload_rejects_malformed_spreadsheet_content(client) -> None:
     response = client.post(
         "/upload",
         files={"file": ("expenses.csv", b"\x80\x81\x82", "text/csv")},
@@ -232,7 +251,7 @@ def test_upload_rejects_malformed_spreadsheet_content() -> None:
     assert response.json()["detail"] == "Unable to parse file content."
 
 
-def test_upload_rejects_files_over_the_configured_size_limit() -> None:
+def test_upload_rejects_files_over_the_configured_size_limit(client) -> None:
     oversized_content = b"x" * (MAX_UPLOAD_SIZE_BYTES + 1)
 
     response = client.post(

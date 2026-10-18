@@ -47,3 +47,22 @@ def test_maps_to_starter_vocabulary_when_specific_category_is_unavailable(
     assert local_heuristics.classify_description("PWN Waterleidingbedrijf") == (
         "Utilities"
     )
+
+
+def test_uses_categories_and_fallback_passed_by_the_application() -> None:
+    assert (
+        local_heuristics.classify_description(
+            "Albert Heijn 1516",
+            allowed_categories=("Grocery", "Unsorted"),
+            fallback_category="Unsorted",
+        )
+        == "Grocery"
+    )
+    assert (
+        local_heuristics.classify_description(
+            "Unknown merchant",
+            allowed_categories=("Grocery", "Unsorted"),
+            fallback_category="Unsorted",
+        )
+        == "Unsorted"
+    )

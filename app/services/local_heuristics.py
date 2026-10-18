@@ -5,7 +5,11 @@ from __future__ import annotations
 from app.config import settings
 
 
-def classify_description(description: str) -> str:
+def classify_description(
+    description: str,
+    allowed_categories: tuple[str, ...] | None = None,
+    fallback_category: str | None = None,
+) -> str:
     description_lower = " ".join(description.casefold().split())
 
     # Each rule lists the workbook-style label first and the starter label
@@ -199,11 +203,11 @@ def classify_description(description: str) -> str:
         (("Food",), ("food", "grocer", "grocery", "bakery")),
     )
 
-    allowed = settings.allowed_categories
+    allowed = allowed_categories or settings.allowed_categories
     for category_options, keywords in rules:
         if any(keyword in description_lower for keyword in keywords):
             for category in category_options:
                 if category in allowed:
                     return category
 
-    return "Other"
+    return fallback_category or settings.fallback_category

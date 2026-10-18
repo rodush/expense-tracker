@@ -14,9 +14,10 @@ from pytest import MonkeyPatch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.config import settings
-from app.main import app
+from app.config import Settings, settings
+from app.main import app, create_app
 from app.services import gemini_service
+from app.services.dataset_store import DatasetStore
 from app.services.gemini_service import normalize_category
 
 client = TestClient(app)
@@ -50,12 +51,44 @@ def test_category_settings_are_loaded_from_config() -> None:
     assert "Other" in settings.allowed_categories
 
 
+def test_app_injects_categories_fallback_and_who_rules(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    configured_settings = Settings(
+        allowed_categories=("Meals", "Unsorted"),
+        fallback_category="Unsorted",
+        who_rules=(gemini_service.rule_engine.WhoRule("card 1234", "Alex"),),
+        unmatched_who="Household",
+    )
+
+    async def categorize(
+        rows: list[dict[str, Any]], **kwargs: Any
+    ) -> list[dict[str, Any]]:
+        assert kwargs["allowed_categories"] == ("Meals", "Unsorted")
+        assert kwargs["fallback_category"] == "Unsorted"
+        return [{**row, "category": kwargs["fallback_category"]} for row in rows]
+
+    monkeypatch.setattr("app.main.categorize_dataframe_async", categorize)
+    configured_app = create_app(app_settings=configured_settings)
+    upload_service = configured_app.state.upload_service
+
+    categorized_rows = asyncio.run(
+        upload_service.categorize([{"description": "Coffee at cafe"}])
+    )
+
+    assert categorized_rows[0]["category"] == "Unsorted"
+    assert upload_service.determine_who("Payment, card 1234") == "Alex"
+    assert upload_service.determine_who("Unmatched") == "Household"
+
+
 def test_categorize_dataframe_batches_records_and_maps_indices(
     monkeypatch: MonkeyPatch,
 ) -> None:
     captured_batch_sizes: list[int] = []
 
-    def fake_call_gemini_batch(batch: list[dict[str, object]]) -> dict[int, str]:
+    def fake_call_gemini_batch(
+        batch: list[dict[str, object]], *args: Any, **kwargs: Any
+    ) -> dict[int, str]:
         captured_batch_sizes.append(len(batch))
         return {int(cast(int, item["record_index"])): "Other" for item in batch}
 
@@ -76,7 +109,7 @@ def test_categorize_dataframe_async_sends_batches_concurrently(
     batch_barrier = threading.Barrier(2)
 
     def fake_classify_batch(
-        batch: list[dict[str, object]], start_index: int
+        batch: list[dict[str, object]], start_index: int, *args: Any, **kwargs: Any
     ) -> dict[int, str]:
         batch_barrier.wait(timeout=1)
         return {start_index + offset: "Other" for offset in range(len(batch))}
@@ -98,7 +131,9 @@ def test_normalize_category_rejects_unknown_values_and_falls_back_to_other() -> 
 def test_categorize_dataframe_falls_back_when_gemini_is_unavailable(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(gemini_service, "_call_gemini_batch", lambda batch: None)
+    monkeypatch.setattr(
+        gemini_service, "_call_gemini_batch", lambda batch, *args, **kwargs: None
+    )
     rows = [{"description": "Coffee at the cafe"}]
     categorized_rows = gemini_service.categorize_dataframe(rows)
 
@@ -108,7 +143,9 @@ def test_categorize_dataframe_falls_back_when_gemini_is_unavailable(
 def test_categorize_dataframe_falls_back_when_gemini_call_raises(
     monkeypatch: MonkeyPatch,
 ) -> None:
-    def explode(batch: list[dict[str, object]]) -> dict[int, str]:
+    def explode(
+        batch: list[dict[str, object]], *args: Any, **kwargs: Any
+    ) -> dict[int, str]:
         raise RuntimeError("transient gemini failure")
 
     monkeypatch.setattr(gemini_service, "_call_gemini_batch", explode)
@@ -124,7 +161,9 @@ def test_categorize_dataframe_retries_transient_gemini_failure(
 ) -> None:
     attempts = 0
 
-    def fail_once(batch: list[dict[str, object]]) -> dict[int, str]:
+    def fail_once(
+        batch: list[dict[str, object]], *args: Any, **kwargs: Any
+    ) -> dict[int, str]:
         nonlocal attempts
         attempts += 1
         if attempts == 1:
@@ -147,7 +186,9 @@ def test_categorize_dataframe_uses_fallback_after_retry_limit(
 ) -> None:
     attempts = 0
 
-    def always_times_out(batch: list[dict[str, object]]) -> dict[int, str]:
+    def always_times_out(
+        batch: list[dict[str, object]], *args: Any, **kwargs: Any
+    ) -> dict[int, str]:
         nonlocal attempts
         attempts += 1
         raise TimeoutError("temporary timeout")
@@ -168,7 +209,9 @@ def test_categorize_dataframe_falls_back_when_gemini_deadline_expires(
 ) -> None:
     attempts = 0
 
-    def deadline_exceeded(batch: list[dict[str, object]]) -> dict[int, str]:
+    def deadline_exceeded(
+        batch: list[dict[str, object]], *args: Any, **kwargs: Any
+    ) -> dict[int, str]:
         nonlocal attempts
         attempts += 1
         raise APIError(504, {"message": "Gemini request timed out"})
@@ -257,18 +300,23 @@ def test_ui_route_serves_the_browser_page() -> None:
 def test_upload_returns_downloadable_csv_file() -> None:
     csv_content = "date,amount,description\n2026-07-01,-15.50,PAS543 Coffee Shop\n"
 
-    response = client.post(
-        "/upload",
-        files={"file": ("expenses.csv", csv_content.encode("utf-8"), "text/csv")},
-    )
+    async def categorize(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [{**row, "category": "Food"} for row in rows]
 
-    assert response.status_code == 200
-    payload = response.json()
-    download_id = payload["download_id"]
-    assert download_id
-    assert payload["preview"][0]["who"] == "Roman"
+    upload_app = create_app(data_store=DatasetStore(), categorizer=categorize)
+    with TestClient(upload_app) as upload_client:
+        response = upload_client.post(
+            "/upload",
+            files={"file": ("expenses.csv", csv_content.encode("utf-8"), "text/csv")},
+        )
 
-    download_response = client.get(f"/download/{download_id}")
-    assert download_response.status_code == 200
-    assert "who" in download_response.text
-    assert "category" in download_response.text
+        assert response.status_code == 200
+        payload = response.json()
+        download_id = payload["download_id"]
+        assert download_id
+        assert payload["preview"][0]["who"] == "Roman"
+
+        download_response = upload_client.get(f"/download/{download_id}")
+        assert download_response.status_code == 200
+        assert "who" in download_response.text
+        assert "category" in download_response.text
