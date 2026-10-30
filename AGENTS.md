@@ -63,7 +63,6 @@ ask user to review it and save into `./docs` folder for future references.
 - Do not create synthetic tests just for the sake of test coverage;
   better to test code indirectly, on a slightly higher level, rather than adding silly unit test.
 
-
 ## Python and FastAPI
 
 - Use Python 3.14 and `uv`.

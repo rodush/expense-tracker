@@ -11,3 +11,4 @@ applyTo: "**"
 - When a fix changes behavior, add or adjust a focused test before implementation and keep the test specific to the regression being fixed. Follow TDD for both stacks; prefer fast, targeted validation unless the change affects shared behavior.
 - For changes spanning both stacks, validate both separately. Build the Docker image when frontend asset paths, packaging, or runtime delivery changes.
 - After the pull-request is merged, make sure to cleanup work artifacts (git branch, git worktree) afterwards.
+- DO NOT run code style and type checks after every small change to the code. ONLY run them in the very end, when you are about to commit the changes.
