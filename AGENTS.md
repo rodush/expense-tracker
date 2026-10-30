@@ -41,9 +41,33 @@ frontend expectations aligned with backend responses.
   behavior in appropriately scoped frontend modules rather than growing one
   monolithic component.
 
+## Software design principles
+
+### Architecture
+
+See `./docs/architecture.md` for high level architecture design and principles.
+
+In general, follow DDD (Domain Driven Design) principles when designing services and structuring business logic.
+Check for the presence of relevant documentation first. If needed, come up with the ubiquitous language,
+ask user to review it and save into `./docs` folder for future references.
+
+### Coding
+
+1. Use OOP principles and patterns when writing code (as described in "The Gang of Four" book).
+1. Follow "Clean Code" (by Robert C. Martin) principles when writing code.
+
+### Quality check
+
+- Use TDD (Test Driven Development) principles.
+- Focus on covering edge cases.
+- Do not create synthetic tests just for the sake of test coverage;
+  better to test code indirectly, on a slightly higher level, rather than adding silly unit test.
+
+
 ## Python and FastAPI
 
-- Use Python 3.14 and `uv`. Follow PEP 8 and the repository's Ruff formatting.
+- Use Python 3.14 and `uv`.
+- Follow PEP 8 and the repository's Ruff formatting.
 - Use type hints, clear names, `pathlib`, and standard-library facilities where
   appropriate. Avoid broad exception swallowing and unused imports.
 - Use the latest stable FastAPI version compatible with the project and prefer
