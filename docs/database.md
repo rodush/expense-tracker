@@ -27,11 +27,11 @@ future schema revision.
 
 ## Local development
 
-From the repository root, install the locked Python dependencies and apply the
-schema:
+From the repository root, install the locked Python dependencies, including
+the migration tool, and apply the schema:
 
 ```sh
-uv sync
+uv sync --group migration
 uv run alembic upgrade head
 ```
 
@@ -90,11 +90,16 @@ container-local storage as ephemeral unless the deployment explicitly mounts
 a durable volume.
 
 Run `uv run alembic upgrade head` once as a release/deployment job using the
-same configuration and database credentials as the application. For a
-multi-instance deployment, coordinate migrations so only one release job
-updates the schema at a time. Back up the database before migrations that may
-drop, rewrite, or transform data, and use an expand/migrate/contract sequence
-when old and new application instances might overlap during a rollout.
+same configuration and database credentials as the application. The migration
+job needs the repository's migration files and the `migration` dependency
+group; the application runtime image does not need either. For example, a CI
+job can run `uv sync --locked --no-dev --group migration` and then
+`uv run alembic upgrade head`. Gate the application rollout on the migration
+job succeeding. For a multi-instance deployment, coordinate migrations so
+only one release job updates the schema at a time. Back up the database before
+migrations that may drop, rewrite, or transform data, and use an
+expand/migrate/contract sequence when old and new application instances might
+overlap during a rollout.
 
 ## Backup and restore
 
