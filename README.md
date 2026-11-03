@@ -5,123 +5,14 @@ Expense Categorizer turns monthly ABN AMRO transaction exports into a persistent
 The repository contains a Svelte frontend in [`frontend/`](./frontend/) and a
 FastAPI backend in [`app/`](./app/), deployed together as a Docker container.
 
-GitHub Actions run the frontend checks, Python checks, and Docker image build on
-pull requests.
+## Tech stack
 
-## Monthly import and expense history
-
-The workflow is:
-
-1. **Upload**: send a CSV, XLS, or XLSX file to `POST /upload`. It must contain
-   date, amount, and description columns. ABN AMRO headers `Transactiedatum`,
-   `Transactiebedrag`, and `Omschrijving` map to those fields.
-2. **Import once**: the server normalizes expenses, resolves who made each
-   expense, categorizes only records not already in the ledger, and stores the
-   result in the configured database. Identical files are recognized by their
-   content hash; overlapping exports are checked record by record.
-3. **Browse history**: the dashboard combines records from every import. Filter
-   by category, person, date range, or quick month/year selection. Export the
-   filtered results or the full history.
-
-Positive amounts (credits) and SEPA transfers to `Savings Account` are excluded
-before categorization; retained debits are stored as positive spending amounts.
-Expenses and their categories do not expire. Database records survive process
-restarts and are shared by app instances using the same database. Without a
-stable bank transaction reference, record fingerprints cannot distinguish
-truly identical transactions across different exports; see the
-[Milestone 4 specification](./.github/specs/milestone-4.md).
-
-## Python application structure
-
-`app/main.py` creates the FastAPI application and wires its services. Upload
-and dataset endpoints live in separate routers; their processing and reporting
-logic is handled by `UploadService` and `DatasetService` in `app/services/`.
-Routers obtain these services with FastAPI dependencies, so tests can replace
-them through `app.dependency_overrides` without patching application globals.
-`create_app` accepts injected stores, categorizer, person resolver, and output
-directory for explicit application-level wiring.
-
-`POST /upload` returns `row_count`, `new_transaction_count`, `duplicate_count`,
-`category_column_added`, `columns`, `preview`, `download_id`, and `dataset_id`.
-The preview includes newly stored rows for the import; repeat uploads report
-zero new records and do not categorize known transactions again.
-
-## Reporting API contract
-
-Historical expenses are queried across all import batches:
-
-```text
-GET /expenses
-GET /expenses/summary
-GET /expenses/filter-options
-GET /expenses/export
-```
-
-Repeated query parameters select multiple values:
-
-```text
-?category=Food&category=Transport&who=Roman&date_from=2026-01-01&date_to=2026-01-31
-```
-
-`GET /expenses` returns a paginated `items` list with `total_count`, `limit`,
-and `offset`. The summary response contains:
-
-- `total_amount`: the sum of selected expenses.
-- `expense_count`: the number of selected rows.
-- `categories`: category name, amount, count, and percentage.
-- `who`: person name, amount, and count.
-- `applied_filters`: the validated category, person, and date selection.
-
-Use repeated `category` and `who` query parameters for multiple selections,
-`date_from` and `date_to` for inclusive date ranges, or `year` and optional
-`month` for quick calendar filtering. Values within one filter use OR
-semantics; different filters combine with AND semantics. Filters may return
-zero matches without error. `/expenses/export` exports the same filtered
-historical records.
-
-## Frontend application
-
-The dynamic upload, historical filtering, download, and dashboard UI is
-implemented in Svelte with Vite. This is a client-side component application,
-not a SvelteKit application: FastAPI continues to serve the page, APIs, and
-compiled assets under `/static/frontend/`. Chart.js is bundled locally, so the
-browser does not load frontend code from a third-party CDN.
-
-The category doughnut chart updates with the selected filters and assigns a
-distinct color to each category in the summary response. The historical expense
-table is paginated. Its Description column is last and
-constrained to about 300 pixels; hovering or focusing a description reveals
-its full text in a viewport-aware tooltip.
-
-To build assets for local development:
-
-```bash
-cd frontend
-npm ci
-npm run build
-cd ..
-uv run alembic upgrade head
-uv run uvicorn app.main:app --reload
-```
-
-The build writes generated files to `app/static/frontend/`; they are ignored
-by Git. The Docker image builds them in a Node.js stage and copies them into
-the FastAPI image.
-
-## Amounts, empty results, and exports
-
-- Amounts are parsed as numeric values during upload. Positive values are
-  treated as card credits, and SEPA transfers whose description names
-  `Savings Account` are excluded before categorization. Retained negative debit
-  values are stored and reported as their absolute values. Thus the ledger
-  contains expenses only, and `total_amount` is a gross spending total.
-- The ledger currently assumes one currency. Currency metadata and mixed
-  currency handling need to be defined before importing accounts with multiple
-  currencies.
-- A valid filter that matches no rows is not an error. It returns
-  `total_amount: 0`, `expense_count: 0`, and empty breakdowns.
-- `/expenses/export` exports the filtered ledger. `/download/{download_id}`
-  remains available for a full categorized CSV associated with one import.
+- Python + FastAPI + SQLAlchemy for backend and persistence
+- Svelte 5+ (not SvelteKit) for the frontend, with Vite for building and the
+  frontend test/check tools declared in `frontend/package.json`
+- PicoCSS for styling
+- SQLite by default; PostgreSQL is supported for hosted deployments
+- GitHub Actions as a CI/CD server (runs the frontend, Python checks, and Docker image build on pull requests)
 
 ## Contribution
 
@@ -135,67 +26,11 @@ In order to contribute to the project, you need to have the following ecosystem:
 - github cli tool [gh](https://cli.github.com/)
 - [trufflehog](https://github.com/trufflesecurity/trufflehog)
 - [Github Agentic Workflows](https://github.com/github/gh-aw) extension
-
-### Tech stack
-
-- Python + FastAPI + SQLAlchemy for backend and persistence
-- Svelte 5+ (not SvelteKit) for the frontend, with Vite for building and the
-  frontend test/check tools declared in `frontend/package.json`
-- PicoCSS for styling
-- SQLite by default; PostgreSQL is supported for hosted deployments
+- Docker container. We use [podman](https://podman.io/)
 
 ## Run locally
 
-Build the frontend, then start FastAPI from the repository root:
-
-```bash
-cd frontend
-npm ci
-npm run build
-cd ..
-uv run fastapi dev
-```
-
-Then open:
-
-```text
-http://127.0.0.1:8000
-```
-
-## Deployment
-
-The application listens on `0.0.0.0` in the container and uses the `PORT`
-environment variable (default `8000`). Build and run a production image with:
-
-```bash
-docker build -t expense-categorizer .
-docker run --rm -p 8000:8000 \
-  -e CATEGORIES=Food,Transport,Utilities,Shopping,Other \
-  -e GEMINI_API_KEY=YOUR_GEMINI_API_KEY \
-  expense-categorizer
-```
-
-The image builds the frontend with the locked npm dependencies and uses the
-locked Python dependencies from `uv.lock`. It does not enable Uvicorn's
-development reload mode and includes a Docker health check. Use
-`GET /health` for liveness and `GET /ready` for readiness monitoring. Both
-endpoints are local-runtime checks and do not replace an external load balancer
-or process supervisor.
-
-For a server deployment, terminate TLS at the reverse proxy, pass secrets
-through the hosting platform's secret store rather than an image or committed
-file, and forward traffic only after `/ready` returns `200`. Set
-`LOG_FORMAT=json` for structured logs and configure `LOG_LEVEL` according to
-the platform's logging policy. Set `DATABASE_URL` to a durable database and
-apply Alembic migrations before serving traffic. SQLite is the default for
-local and single-host deployments; see the database guide before choosing a
-multi-host deployment database.
-
-Database setup, migrations, production configuration, backup/restore, and
-current expense/download retention behavior are documented in
-[`docs/database.md`](./docs/database.md).
-
-## Environment variables
+### Environment variables
 
 Create a `.env` file (`cp .env.example .env`) or export the following variables:
 
@@ -211,61 +46,143 @@ export LOG_LEVEL=INFO
 export LOG_FORMAT=json
 ```
 
-Application logs are emitted as one JSON object per line by default. Set
-`LOG_LEVEL` to `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`; set
-`LOG_FORMAT=text` for human-readable local output. Logs include request IDs,
-HTTP method/path, status, duration, and operation metadata, but never include
-API keys or uploaded file contents.
+### Build and run applications
 
-## Category config
+1. Build the frontend (from `frontend` subfolder):
 
-Categories and deterministic `who` matching rules are deployment-level
-configuration for this milestone. Per-account settings management will build
-on the persisted configuration model after authentication is introduced.
-
-The category list is read from `CATEGORIES` and the fallback from
-`FALLBACK_CATEGORY`; the fallback must be one of the configured categories.
-`TRANSACTION_DATE_FORMAT` uses Python `strptime` directives and defaults to
-`%Y%m%d`, matching the ABN AMRO export's `YYYYMMDD` date values. For another
-bank format, configure its corresponding format (for example `%d-%m-%Y`).
-`WHO_RULES` is a JSON array of literal, case-insensitive substring rules in
-first-match order. Each rule contains exactly `contains` and `who`, for example:
-
-```json
-[{"contains":"card ending 1234","who":"Alex"}]
-```
-
-Rules are bounded and validated at startup; regular expressions and executable
-expressions are not accepted. `WHO_UNMATCHED_LABEL` names transactions that
-match no rule. If no who rules are configured, existing Roman/Oksana matching
-defaults are retained.
-
-- Food
-- Transport
-- Utilities
-- Shopping
-- Other
-
-## Testing
-
-In the project root directory run
-
-```bash
+```sh
 cd frontend
 npm ci
-npm run lint
-npm run format:check
-npm test
-npm run check
 npm run build
-cd ..
-uv run pytest
-uv run ruff format --check
-uv run ruff check
-uv run ty check
 ```
 
-CI runs frontend linting, formatting verification, tests, Svelte diagnostics,
+2. Run database migrations (from the root of the project):
+
+```sh
+cd ..
+uv run alembic upgrade head
+```
+
+3. Start FastAPI (from the repository root):
+
+```sh
+uv run fastapi dev
+```
+
+Website will open at:
+
+```text
+http://127.0.0.1:8000
+```
+
+You can just click the link in TUI, and default web browser will open the page.
+
+## Run with containers (PostgreSQL)
+
+The Compose setup runs the app and PostgreSQL in separate containers. It keeps
+PostgreSQL data in a named volume, waits for the database to become healthy,
+and applies Alembic migrations before starting the app.
+
+1. Copy the example environment file and edit it as needed:
+
+   ```sh
+   cp .env.example .env
+   ```
+
+   Set `GEMINI_API_KEY` to your key, or leave it empty to use the local
+   categorization fallback. The example PostgreSQL password is for local
+   development only; replace it if the database will be reachable outside your
+   machine. Keep `.env` private and do not commit it.
+
+2. Start the containers from the repository root.
+
+   With Docker Compose:
+
+   ```sh
+   docker compose up --build -d
+   ```
+
+   With Podman, first build in Docker format so the image retains the
+   Dockerfile health check, then start Compose without rebuilding:
+
+   ```sh
+   podman build --format docker -t expense-categorizer:local .
+   podman compose up -d --no-build
+   ```
+
+   `podman compose` requires an installed Compose provider, such as
+   `podman-compose` or Docker Compose.
+
+3. Open [http://127.0.0.1:8000](http://127.0.0.1:8000). To use another host
+   port, set `APP_PORT` in `.env`; the app remains available on port 8000
+   inside the container.
+
+Useful commands:
+
+```sh
+docker compose ps
+docker compose logs -f app
+docker compose down
+```
+
+For Podman, replace `docker compose` with `podman compose`. Stopping the
+containers does not remove the PostgreSQL data volume. To permanently delete
+the database and all imported expense data, run `docker compose down -v` (or
+`podman compose down -v`).
+
+## Deployment
+
+The application listens on `0.0.0.0` in the container and uses the `PORT`
+environment variable (default `8000`).
+
+Build and run a production image with:
+
+```sh
+docker build -t expense-categorizer .
+docker run --rm -p 8000:8000 \
+  -e CATEGORIES=Food,Transport,Utilities,Shopping,Other \
+  -e GEMINI_API_KEY=YOUR_GEMINI_API_KEY \
+  expense-categorizer
+```
+
+### NOTE on Podman
+
+When building container with `podman`, you might get warning:
+
+> WARN[0092] HEALTHCHECK is not supported for OCI image format and will be ignored. Must use `docker` format
+
+The right command is:
+
+```sh
+podman build --format docker -t expense-categorizer .
+```
+
+The image builds the frontend with the locked npm dependencies and uses the
+locked Python dependencies from `uv.lock`. It does not enable Uvicorn's
+development reload mode and includes a Docker health check. Use
+`GET /health` for liveness and `GET /ready` for readiness monitoring. Both
+endpoints are local-runtime checks and do not replace an external load balancer
+or process supervisor.
+
+For a server deployment, terminate TLS at the reverse proxy, pass secrets
+through the hosting platform's secret store rather than an image or committed
+file, and forward traffic only after `/ready` returns `200`. Set
+`LOG_FORMAT=json` for structured logs and configure `LOG_LEVEL` according to
+the platform's logging policy. Set `DATABASE_URL` to a durable database and
+apply Alembic migrations before serving traffic.
+SQLite is the default for local and single-host deployments;
+see the database guide before choosing a multi-host deployment database.
+
+Database setup, migrations, production configuration, backup/restore, and
+current expense/download retention behavior are documented in
+[`docs/database.md`](./docs/database.md).
+
+## CI/CD
+
+Once code is pushed to remote Github repository and pull-request is opened,
+the corresponding workflow of Github Actions is triggered.
+
+Workflow perform frontend linting, formatting verification, tests, Svelte diagnostics,
 and the production build for every pull request and for pushes to `master`.
 Run `npm run format` from `frontend/` to apply Prettier formatting. ESLint uses
 the official Svelte plugin with its recommended rules. Prettier is configured
@@ -282,11 +199,8 @@ descriptions.
 
 ## TODO
 
-### Persistence and rollout notes
-
-Expense records use the configured relational database and do not expire.
-Account ownership enforcement, user-visible retention/deletion, currency
-metadata, and automated cleanup remain future production work. See
-[`docs/database.md`](./docs/database.md) for setup, migrations, backup/restore,
-and current lifecycle boundaries. Import batches record upload metadata; the
-ledger is the canonical source for history, summaries, and historical exports.
+- [] Account settings
+- [] Ability to manually configure categories and "who" rules in the Account
+- [] Ability to overwrite, manually change the pre-assigned category
+- [] Ideally, integration with the Bank API, but it's not feasible as requires PSD compliance.
+- [] Re-use build artifact, or consider not running build as part of PR, only type checking.

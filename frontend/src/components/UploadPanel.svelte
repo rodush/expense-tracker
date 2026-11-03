@@ -68,7 +68,7 @@
     >
       {#if isUploading}
         <span class="button-spinner" aria-hidden="true"></span>
-        Analyzing statement…
+        Analyzing statement...
       {:else}
         Analyze expenses
         <span aria-hidden="true">→</span>
