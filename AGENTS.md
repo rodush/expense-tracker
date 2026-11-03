@@ -17,8 +17,8 @@ This is a Python and Svelte project:
 - Built frontend assets are generated under `app/static/frontend/` and served
   through FastAPI's `/static` mount. Do not edit generated build output by hand.
 
-The README documents current API behavior and domain rules. Treat API contracts,
-financial calculations, and expense filtering rules as sensitive behavior: keep
+Files in the [docs](./docs/) directory describe current API behavior and domain rules.
+Treat API contracts, financial calculations, and expense filtering rules as sensitive behavior: keep
 frontend expectations aligned with backend responses.
 
 ## General safety and change discipline
