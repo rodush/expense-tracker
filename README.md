@@ -30,6 +30,10 @@ In order to contribute to the project, you need to have the following ecosystem:
 
 ## Run locally
 
+This runs the app directly on your machine and does not require Docker,
+Podman, or PostgreSQL. The SQLite `DATABASE_URL` below stores data in
+`expense-tracker.db` in the project directory.
+
 ### Environment variables
 
 Create a `.env` file (`cp .env.example .env`) or export the following variables:
@@ -60,6 +64,7 @@ npm run build
 
 ```sh
 cd ..
+uv sync --group migration
 uv run alembic upgrade head
 ```
 
@@ -80,8 +85,9 @@ You can just click the link in TUI, and default web browser will open the page.
 ## Run with containers (PostgreSQL)
 
 The Compose setup runs the app and PostgreSQL in separate containers. It keeps
-PostgreSQL data in a named volume, waits for the database to become healthy,
-and applies Alembic migrations before starting the app.
+PostgreSQL data in a named volume and waits for the database to become healthy.
+Alembic migrations are run explicitly from the project environment before the
+app starts; the runtime image does not contain migration tooling.
 
 1. Copy the example environment file and edit it as needed:
 
@@ -89,46 +95,88 @@ and applies Alembic migrations before starting the app.
    cp .env.example .env
    ```
 
-   Set `GEMINI_API_KEY` to your key, or leave it empty to use the local
-   categorization fallback. The example PostgreSQL password is for local
-   development only; replace it if the database will be reachable outside your
-   machine. Keep `.env` private and do not commit it.
-
-2. Start the containers from the repository root.
-
-   With Docker Compose:
+   Supply the Gemini key through your shell environment, not `.env`. For
+   example, export it in the terminal before starting or recreating the app:
 
    ```sh
-   docker compose up --build -d
+   read -rsp "Gemini API key: " GEMINI_API_KEY
+   export GEMINI_API_KEY
+   printf '\n'
    ```
 
-   With Podman, first build in Docker format so the image retains the
-   Dockerfile health check, then start Compose without rebuilding:
+   Compose forwards this shell variable to the app container. Keep it exported
+   in the same terminal when running `podman compose up`; if the app container
+   already exists, recreate it to update its environment:
+
+   ```sh
+   podman compose up -d --no-build --force-recreate app
+   ```
+
+   Unset it when you no longer need it in the current shell with
+   `unset GEMINI_API_KEY`. If the key is not set, the app uses the local
+   categorization fallback. The example PostgreSQL password is for local
+   development only; replace it if the database will be reachable outside your
+   machine. Keep `.env` private and do not commit it. For host-side migrations,
+   `DATABASE_URL` must use `127.0.0.1` and the published PostgreSQL port; the
+   example file is already configured that way. If you have an older `.env`,
+   change `DATABASE_URL` to
+   `postgresql+psycopg://expense_tracker:local-dev-password@127.0.0.1:5432/expense_tracker`.
+   Keep its username and password in sync with `POSTGRES_USER` and
+   `POSTGRES_PASSWORD`. The app container gets its separate Compose-network
+   URL automatically.
+
+2. Start PostgreSQL from the repository root:
+
+   ```sh
+   podman compose up -d db
+   podman compose ps
+   ```
+
+   The database is published on `127.0.0.1:5432` by default so host-side
+   migration commands can connect to it. Confirm the `db` service is healthy
+   before running the migration. Set `POSTGRES_PORT` in `.env` to use another
+   local port.
+
+3. From the project root, install the locked Python dependencies and apply
+   migrations to that PostgreSQL database:
+
+   ```sh
+   uv sync --group migration
+   uv run alembic upgrade head
+   ```
+
+   `DATABASE_URL` in `.env` points the host-side migration command at the
+   published database port. If you change `POSTGRES_PORT`, update the port in
+   `DATABASE_URL` to match. The database username and password in that URL
+   must match `POSTGRES_USER` and `POSTGRES_PASSWORD`.
+
+4. Build and start the application:
 
    ```sh
    podman build --format docker -t expense-categorizer:local .
-   podman compose up -d --no-build
+   podman compose up -d --no-build app
    ```
 
-   `podman compose` requires an installed Compose provider, such as
-   `podman-compose` or Docker Compose.
+   The app container uses `db:5432` on the Compose network; host-side Alembic
+   uses `127.0.0.1` and the published port. On subsequent schema updates, run
+   `uv run alembic upgrade head` from the project root before deploying the
+   updated app image.
 
-3. Open [http://127.0.0.1:8000](http://127.0.0.1:8000). To use another host
+5. Open [http://127.0.0.1:8000](http://127.0.0.1:8000). To use another host
    port, set `APP_PORT` in `.env`; the app remains available on port 8000
    inside the container.
 
 Useful commands:
 
 ```sh
-docker compose ps
-docker compose logs -f app
-docker compose down
+podman compose ps
+podman compose logs -f app
+podman compose down
 ```
 
-For Podman, replace `docker compose` with `podman compose`. Stopping the
-containers does not remove the PostgreSQL data volume. To permanently delete
-the database and all imported expense data, run `docker compose down -v` (or
-`podman compose down -v`).
+Stopping the containers does not remove the PostgreSQL data volume. To
+permanently delete the database and all imported expense data, run
+`podman compose down -v`.
 
 ## Deployment
 
@@ -137,13 +185,27 @@ environment variable (default `8000`).
 
 Build and run a production image with:
 
+For deployment, set `DATABASE_URL` in the runtime environment to the durable
+database used by the migration job. Do not rely on the image's default
+container-local SQLite database for persistent production data.
+
 ```sh
 docker build -t expense-categorizer .
 docker run --rm -p 8000:8000 \
+  -e DATABASE_URL \
   -e CATEGORIES=Food,Transport,Utilities,Shopping,Other \
   -e GEMINI_API_KEY=YOUR_GEMINI_API_KEY \
   expense-categorizer
 ```
+
+Apply database migrations as a separate deployment step, using a migration
+job or release task with the same database configuration as the app. In CI/CD,
+that job should check out the release's migration files, install the project's
+migration group (`uv sync --locked --no-dev --group migration`), and run
+`uv run alembic upgrade head` with `DATABASE_URL` supplied from the deployment's
+secret store. Gate the app rollout on the migration job succeeding, and
+coordinate so only one job migrates a database at a time. Do not run
+migrations automatically in each application container's startup command.
 
 ### NOTE on Podman
 
