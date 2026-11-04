@@ -95,7 +95,25 @@ app starts; the runtime image does not contain migration tooling.
    cp .env.example .env
    ```
 
-   Set `GEMINI_API_KEY` to your key, or leave it empty to use the local
+   Supply the Gemini key through your shell environment, not `.env`. For
+   example, export it in the terminal before starting or recreating the app:
+
+   ```sh
+   read -rsp "Gemini API key: " GEMINI_API_KEY
+   export GEMINI_API_KEY
+   printf '\n'
+   ```
+
+   Compose forwards this shell variable to the app container. Keep it exported
+   in the same terminal when running `podman compose up`; if the app container
+   already exists, recreate it to update its environment:
+
+   ```sh
+   podman compose up -d --no-build --force-recreate app
+   ```
+
+   Unset it when you no longer need it in the current shell with
+   `unset GEMINI_API_KEY`. If the key is not set, the app uses the local
    categorization fallback. The example PostgreSQL password is for local
    development only; replace it if the database will be reachable outside your
    machine. Keep `.env` private and do not commit it. For host-side migrations,
