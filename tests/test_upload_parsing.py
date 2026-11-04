@@ -134,9 +134,9 @@ def test_upload_filters_credits_before_categorization_and_uses_absolute_debits(
         "2026-07-01,-15.50,Coffee\n"
         "2026-07-02,120.00,Card top-up\n"
         "2026-07-03,0.001,Small credit\n"
-        "2026-07-04,-500.00,SEPA Overboeking                 "
-        "IBAN: TEST        BIC: TEST                    "
-        "Naam: Savings Account           Kenmerk: NOTPROVIDED\n"
+        "2026-07-04,-500.00,SEPA Overboeking"
+        "IBAN: TEST        BIC: TEST"
+        "Sepa Overboeking: NL78ABNA000024265768\n"
         "2026-07-05,-2.75,Lunch\n"
     )
 
