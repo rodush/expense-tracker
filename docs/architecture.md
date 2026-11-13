@@ -25,6 +25,15 @@ directory for explicit application-level wiring.
 The preview includes newly stored rows for the import; repeat uploads report
 zero new records and do not categorize known transactions again.
 
+## Deployment access boundary
+
+The current ledger belongs to one trusted household; authentication and per-account
+ownership remain milestone 5 work. Deploy only on a trusted private network.
+The supplied Compose mapping publishes HTTP on host loopback. Remote access must
+use an SSH tunnel or private VPN, with no public proxy forwarding to the service.
+All history, dataset, upload, download, and WebSocket routes share this boundary.
+Container networks must also be restricted to trusted workloads.
+
 ## Reporting API contract
 
 Historical expenses are queried across all import batches:
@@ -86,7 +95,7 @@ Set `LOG_LEVEL` to `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`.\
 Set `LOG_FORMAT=text` for human-readable local output.
 
 Logs include request IDs, HTTP method/path, status, duration, and operation metadata,
-but never include API keys or uploaded file contents.
+but never include API keys, uploaded filenames, or uploaded file contents.
 
 PII is masked in the logs.
 

@@ -90,7 +90,7 @@ class UploadService:
         if file_extension not in ALLOWED_EXTENSIONS:
             logger.warning(
                 "Rejected unsupported upload",
-                extra={"file_name": filename, "extension": file_extension},
+                extra={"operation": "upload"},
             )
             raise ServiceError(
                 400,
@@ -179,7 +179,7 @@ class UploadService:
         except OSError as exc:
             logger.exception(
                 "Failed to persist categorized upload",
-                extra={"file_name": filename, "download_id": download_id},
+                extra={"download_id": download_id},
             )
             raise ServiceError(
                 503,
@@ -188,7 +188,7 @@ class UploadService:
         except (RuntimeError, ValueError, SQLAlchemyError) as exc:
             logger.exception(
                 "Failed to store categorized upload",
-                extra={"file_name": filename, "download_id": download_id},
+                extra={"download_id": download_id},
             )
             raise ServiceError(
                 503,
@@ -198,7 +198,6 @@ class UploadService:
         logger.info(
             "Upload processed successfully",
             extra={
-                "file_name": filename,
                 "rows": len(normalized_rows),
                 "new_transaction_count": len(inserted_rows),
                 "duplicate_count": duplicate_count,
@@ -226,7 +225,7 @@ class UploadService:
         except Exception as exc:
             logger.exception(
                 "Failed to parse uploaded spreadsheet",
-                extra={"file_name": filename},
+                extra={"operation": "upload"},
             )
             raise ServiceError(400, "Unable to parse file content.") from exc
 
@@ -235,7 +234,7 @@ class UploadService:
         if missing_columns:
             logger.warning(
                 "Upload missing required columns",
-                extra={"file_name": filename, "missing_columns": missing_columns},
+                extra={"missing_columns": missing_columns},
             )
             raise ServiceError(
                 400, f"Missing required columns: {', '.join(missing_columns)}"
@@ -251,7 +250,7 @@ class UploadService:
         except (TypeError, ValueError) as exc:
             logger.warning(
                 "Upload contains an invalid transaction field",
-                extra={"file_name": filename},
+                extra={"operation": "upload"},
             )
             raise ServiceError(400, str(exc)) from exc
 
@@ -275,7 +274,7 @@ class UploadService:
             normalized_dataset_rows = normalize_rows(normalized_rows)
         except (TypeError, ValueError) as exc:
             logger.warning(
-                "Upload contains an invalid amount", extra={"file_name": filename}
+                "Upload contains an invalid amount", extra={"operation": "upload"}
             )
             raise ServiceError(400, str(exc)) from exc
         return dataframe, category_column_added, normalized_dataset_rows

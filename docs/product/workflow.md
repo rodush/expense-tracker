@@ -12,3 +12,8 @@ The workflow is:
 3. **Browse history**: the dashboard combines records from every import. Filter
    by category, person, date range, or quick month/year selection. Export the
    filtered results or the full history.
+
+Uploads are limited to 5 MiB. The route reads at most 5 MiB plus one byte before
+service validation rejects oversized files with HTTP 413. Multipart parsing may
+spool incoming files to temporary storage; private deployments should also set
+a request body limit at their proxy to bound temporary disk usage.
