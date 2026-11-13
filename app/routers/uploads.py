@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import FileResponse
 
 from app.dependencies import get_upload_service
-from app.services.upload_service import UploadService
+from app.services.upload_service import MAX_UPLOAD_SIZE_BYTES, UploadService
 
 router = APIRouter()
 logger = logging.getLogger("expense_tracker")
@@ -18,8 +18,10 @@ async def upload_expense_file(
     file: Annotated[UploadFile, File(...)],
     service: Annotated[UploadService, Depends(get_upload_service)],
 ) -> dict[str, Any]:
-    logger.info("Upload requested", extra={"file_name": file.filename})
-    return await service.process_upload(file.filename, await file.read())
+    logger.info("Upload requested")
+    return await service.process_upload(
+        file.filename, await file.read(MAX_UPLOAD_SIZE_BYTES + 1)
+    )
 
 
 @router.get("/download/{download_id}")
