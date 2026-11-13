@@ -166,3 +166,31 @@ def test_overlapping_exports_add_only_new_rows_and_history_survives_restart(
         assert restarted_history.summary(people=["Household"])["expense_count"] == 3
     finally:
         engine.dispose()
+
+
+def test_database_sort_is_global_and_stable_across_pages(tmp_path) -> None:
+    engine, factory = _factory(tmp_path)
+    try:
+        store = DatabaseDatasetStore(factory)
+        store.create(
+            [
+                {
+                    "date": "2026-01-01",
+                    "amount": amount,
+                    "description": f"Example {index}",
+                    "category": "Food",
+                    "who": "General",
+                }
+                for index, amount in enumerate([30, 2, 10, 2])
+            ]
+        )
+        service = ExpenseHistoryService(store)
+        first = service.list_expenses(sort_by="amount", sort_direction="asc", limit=2)
+        second = service.list_expenses(
+            sort_by="amount", sort_direction="asc", offset=2, limit=2
+        )
+        assert [row["amount"] for row in first["items"]] == [2, 2]
+        assert [row["amount"] for row in second["items"]] == [10, 30]
+        assert first["items"][0]["description"] != first["items"][1]["description"]
+    finally:
+        engine.dispose()

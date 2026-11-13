@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -24,9 +24,20 @@ def list_expenses(
     month: int | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    sort_by: Literal["date", "amount", "who", "category", "description"] = "date",
+    sort_direction: Literal["asc", "desc"] = "desc",
 ) -> dict[str, Any]:
     return service.list_expenses(
-        category, who, date_from, date_to, year, month, offset, limit
+        category,
+        who,
+        date_from,
+        date_to,
+        year,
+        month,
+        offset,
+        limit,
+        sort_by,
+        sort_direction,
     )
 
 

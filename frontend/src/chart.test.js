@@ -35,7 +35,7 @@ describe("category chart", () => {
         label: "Food",
         dataIndex: 0,
       }),
-    ).toBe("Food: 8.00");
+    ).toBe("Food: €8.00");
   });
 
   it("places the category legend beside the doughnut chart", () => {

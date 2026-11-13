@@ -47,15 +47,26 @@
       />
     </label>
     <small id="fileHelp" class="file-help">
-      Your statement is used to prepare this report.
+      Import EUR statements only. New expenses are saved in this ledger,
+      assigned a person and category, and duplicates are skipped. Categorization
+      may use an external AI service when configured.
     </small>
+
+    <details class="import-help">
+      <summary>Statement format requirements</summary>
+      <p>
+        Include date, amount and description columns. ABN AMRO headers
+        Transactiedatum, Transactiebedrag and Omschrijving are also supported.
+        Date formats follow this deployment’s import settings.
+      </p>
+    </details>
 
     {#if selectedFile}
       <p class="selected-file" role="status">
         <span class="selected-file-check" aria-hidden="true">✓</span>
         <span>
           <strong>{selectedFile.name}</strong>
-          <small>Ready to analyze</small>
+          <small>Ready to import</small>
         </span>
       </p>
     {/if}
@@ -68,9 +79,9 @@
     >
       {#if isUploading}
         <span class="button-spinner" aria-hidden="true"></span>
-        Analyzing statement...
+        Importing statement...
       {:else}
-        Analyze expenses
+        Import expenses
         <span aria-hidden="true">→</span>
       {/if}
     </button>

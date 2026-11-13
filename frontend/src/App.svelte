@@ -18,6 +18,19 @@
   let hasUploaded = $state(false);
   let uploadAccordion = $state();
   let historyError = $state("");
+  let filterError = $state("");
+  let ledgerHasExpenses = $state(false);
+  let initialLoadComplete = $state(false);
+  let sortBy = $state("date");
+  let sortDirection = $state("desc");
+  const hasFilters = $derived(
+    selectedCategories.length ||
+      selectedPeople.length ||
+      dateFrom ||
+      dateTo ||
+      selectedYear ||
+      selectedMonth,
+  );
   let isLoadingHistory = $state(false);
   let rows = $state([]);
   let totalCount = $state(0);
@@ -42,7 +55,7 @@
       dateTo,
       year: selectedYear,
       month: selectedMonth,
-      ...(paging ? { limit: pageSize, offset } : {}),
+      ...(paging ? { limit: pageSize, offset, sortBy, sortDirection } : {}),
     };
   }
 
@@ -50,12 +63,15 @@
 
   async function refreshFilterOptions() {
     try {
+      filterError = "";
       const options = await fetchFilterOptions();
       categoryOptions = options.categories ?? [];
       whoOptions = options.who ?? [];
       years = options.years ?? [];
+      ledgerHasExpenses =
+        years.length > 0 || categoryOptions.length > 0 || whoOptions.length > 0;
     } catch (error) {
-      historyError =
+      filterError =
         error instanceof Error
           ? error.message
           : "Unable to load expense filters.";
@@ -66,6 +82,13 @@
     const requestId = ++activeRequest;
     isLoadingHistory = true;
     historyError = "";
+    rows = [];
+    summary = null;
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      historyError = "The start date must not be after the end date.";
+      isLoadingHistory = false;
+      return;
+    }
     const filters = currentFilters(true);
     try {
       const [page, totals] = await Promise.all([
@@ -76,6 +99,12 @@
       rows = page.items ?? [];
       totalCount = page.total_count ?? 0;
       summary = totals;
+      if (page.total_count > 0) ledgerHasExpenses = true;
+      if (!initialLoadComplete) {
+        initialLoadComplete = true;
+        if (!ledgerHasExpenses && !hasFilters && uploadAccordion)
+          uploadAccordion.open = true;
+      }
     } catch (error) {
       if (requestId !== activeRequest) return;
       historyError =
@@ -136,6 +165,13 @@
     }
   }
 
+  function changeSort(key) {
+    sortDirection = sortBy === key && sortDirection === "asc" ? "desc" : "asc";
+    sortBy = key;
+    offset = 0;
+    loadHistory();
+  }
+
   function previousPage() {
     offset = Math.max(0, offset - pageSize);
     loadHistory();
@@ -157,9 +193,12 @@
 <main class="container app-shell">
   <section
     class="welcome"
-    aria-labelledby={hasUploaded ? undefined : "welcomeHeading"}
+    class:returning={ledgerHasExpenses}
+    aria-labelledby={hasUploaded || ledgerHasExpenses
+      ? undefined
+      : "welcomeHeading"}
   >
-    {#if !hasUploaded}
+    {#if !hasUploaded && !ledgerHasExpenses}
       <div class="welcome-copy">
         <p class="eyebrow">Your household spending ledger</p>
         <h1 id="welcomeHeading">Make sense of your spending.</h1>
@@ -191,7 +230,12 @@
   </section>
 
   {#if uploadMessage}
-    <p class="success-message" role="status">{uploadMessage}</p>
+    <p class="success-message" role="status">
+      {uploadMessage}
+      <a href="#transactionsHeading">
+        Review transaction categories and people
+      </a>
+    </p>
   {/if}
 
   <section
@@ -206,8 +250,15 @@
         <p>Filter expenses by category, person, and transaction date.</p>
       </div>
     </header>
+    {#if filterError}
+      <p class="error-message" role="alert">{filterError}</p>
+      <button type="button" onclick={refreshFilterOptions}>
+        Retry filters
+      </button>
+    {/if}
     {#if historyError}
-      <p class="error-message" role="alert">{historyError}</p>
+      <p id="reportError" class="error-message" role="alert">{historyError}</p>
+      <button type="button" onclick={loadHistory}>Retry report</button>
     {/if}
     <DashboardPanel
       {categoryOptions}
@@ -223,15 +274,27 @@
       onclearfilters={clearFilters}
       onfilterchange={handleFilterChange}
     />
-    <PreviewPanel
-      {rows}
-      {totalCount}
-      {offset}
-      limit={pageSize}
-      loading={isLoadingHistory}
-      {filteredDownloadUrl}
-      onprevious={previousPage}
-      onnext={nextPage}
-    />
+    {#if isLoadingHistory}
+      <p class="empty-state" role="status">Loading report…</p>
+    {:else if !historyError && summary?.expense_count === 0}
+      <p class="empty-state" role="status">
+        {hasFilters
+          ? "No expenses match these filters. Clear filters to see everything."
+          : "Your ledger is empty. Import a statement to get started."}
+      </p>
+    {:else if !historyError && summary}
+      <PreviewPanel
+        {rows}
+        {totalCount}
+        {offset}
+        limit={pageSize}
+        {sortBy}
+        {sortDirection}
+        onsort={changeSort}
+        {filteredDownloadUrl}
+        onprevious={previousPage}
+        onnext={nextPage}
+      />
+    {/if}
   </section>
 </main>

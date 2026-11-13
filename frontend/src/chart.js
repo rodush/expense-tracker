@@ -1,3 +1,4 @@
+import { formatAmount } from "./money";
 import Chart from "chart.js/auto";
 
 let categoryChart = null;
@@ -62,8 +63,4 @@ export function createOrUpdateCategoryChart(
 export function destroyCategoryChart() {
   categoryChart?.destroy();
   categoryChart = null;
-}
-
-function formatAmount(amount) {
-  return Number(amount).toFixed(2);
 }

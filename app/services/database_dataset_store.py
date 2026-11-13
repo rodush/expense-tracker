@@ -115,6 +115,8 @@ class DatabaseDatasetStore:
         date_to: date | None = None,
         offset: int = 0,
         limit: int | None = 100,
+        sort_by: str = "date",
+        sort_direction: str = "desc",
     ) -> tuple[list[dict[str, object]], int]:
         with self._session_factory() as session:
             rows, total_count = DatasetRepository(session).list_expenses(
@@ -125,6 +127,8 @@ class DatabaseDatasetStore:
                 date_to=date_to,
                 offset=offset,
                 limit=limit,
+                sort_by=sort_by,
+                sort_direction=sort_direction,
             )
             return [dict(row.values) for row in rows], total_count
 

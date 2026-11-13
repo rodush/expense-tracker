@@ -43,7 +43,12 @@ Repeated query parameters select multiple values:
 ```
 
 `GET /expenses` returns a paginated `items` list with `total_count`, `limit`,
-and `offset`. The summary response contains:
+and `offset`. It accepts `sort_by` (`date`, `amount`, `who`, `category`,
+`description`) and `sort_direction` (`asc`, `desc`), defaulting to date descending.
+Sorting is applied to the filtered ledger before pagination with stable tie ordering.
+Export includes all matching rows in default date order; it is not paginated.
+The UI labels monetary values as EUR, matching the single-currency ledger assumption.
+The summary response contains:
 
 - `total_amount`: the sum of selected expenses.
 - `expense_count`: the number of selected rows.

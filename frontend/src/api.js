@@ -22,6 +22,8 @@ function buildFilterParams(filters = {}, { paging = false } = {}) {
   if (paging) {
     params.set("limit", filters.limit ?? 25);
     params.set("offset", filters.offset ?? 0);
+    params.set("sort_by", filters.sortBy ?? "date");
+    params.set("sort_direction", filters.sortDirection ?? "desc");
   }
   return params;
 }

@@ -109,3 +109,19 @@ def test_history_rejects_conflicting_or_invalid_date_filters() -> None:
             == invalid_range.status_code
             == 400
         )
+
+
+def test_history_sorts_before_pagination_and_rejects_unknown_sort() -> None:
+    app, _ = _history_app()
+    with TestClient(app) as client:
+        content = "date,amount,description\n" + "".join(
+            f"2026-01-01,-{amount}.00,Example {amount}\n" for amount in range(30, 0, -1)
+        )
+        assert _upload(client, content.encode()).status_code == 200
+        first = client.get("/expenses?sort_by=amount&sort_direction=asc&limit=25")
+        second = client.get(
+            "/expenses?sort_by=amount&sort_direction=asc&limit=25&offset=25"
+        )
+        assert [r["amount"] for r in first.json()["items"]] == list(range(1, 26))
+        assert [r["amount"] for r in second.json()["items"]] == list(range(26, 31))
+        assert client.get("/expenses?sort_by=unknown").status_code == 422
