@@ -191,7 +191,7 @@ container-local SQLite database for persistent production data.
 
 ```sh
 docker build -t expense-categorizer .
-docker run --rm -p 8000:8000 \
+docker run --rm -p 127.0.0.1:8000:8000 \
   -e DATABASE_URL \
   -e CATEGORIES=Food,Transport,Utilities,Shopping,Other \
   -e GEMINI_API_KEY=YOUR_GEMINI_API_KEY \
@@ -226,7 +226,15 @@ development reload mode and includes a Docker health check. Use
 endpoints are local-runtime checks and do not replace an external load balancer
 or process supervisor.
 
-For a server deployment, terminate TLS at the reverse proxy, pass secrets
+This release has no authentication or dataset ownership enforcement. Run it only
+on a trusted private network for one household. Compose and the Docker command
+above publish the app on host loopback only. Use an SSH tunnel or a private VPN
+for remote access; do not expose the port or forward a public reverse proxy to
+it. Keep container networks private as well: containers on the same network can
+reach the app directly. Public deployment requires account authentication and
+object ownership checks first (milestone 5).
+
+For a private server deployment, terminate TLS at the reverse proxy, pass secrets
 through the hosting platform's secret store rather than an image or committed
 file, and forward traffic only after `/ready` returns `200`. Set
 `LOG_FORMAT=json` for structured logs and configure `LOG_LEVEL` according to

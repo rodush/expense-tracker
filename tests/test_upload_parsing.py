@@ -282,3 +282,38 @@ def test_upload_rejects_files_over_the_configured_size_limit(client) -> None:
 
     assert response.status_code == 413
     assert response.json()["detail"] == "Uploaded file is too large."
+
+
+def test_upload_router_bounds_read_before_processing() -> None:
+    from unittest.mock import AsyncMock
+
+    from app.routers.uploads import upload_expense_file
+
+    file = AsyncMock()
+    file.filename = "statement.csv"
+    file.read.return_value = b"oversized sentinel"
+    service = AsyncMock()
+    asyncio.run(upload_expense_file(file, service))
+    file.read.assert_awaited_once_with(MAX_UPLOAD_SIZE_BYTES + 1)
+    service.process_upload.assert_awaited_once_with(
+        "statement.csv", b"oversized sentinel"
+    )
+
+
+@pytest.mark.parametrize(
+    ("filename", "content"),
+    [
+        ("private-statement.csv", b"date,amount,description\n20260101,-1,Example\n"),
+        ("private-statement.txt", b"invalid"),
+        ("../private-statement.csv", b"invalid"),
+        ("private-statement.csv", b"invalid"),
+    ],
+)
+def test_upload_does_not_log_filename(client, caplog, filename, content) -> None:
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="expense_tracker"):
+        client.post("/upload", files={"file": (filename, content)})
+    assert all(
+        "private-statement" not in str(record.__dict__) for record in caplog.records
+    )
