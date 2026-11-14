@@ -117,6 +117,8 @@ class DatasetRepository:
         date_to: date | None,
         offset: int,
         limit: int | None,
+        sort_by: str = "date",
+        sort_direction: str = "desc",
     ) -> tuple[list[ExpenseRow], int]:
         conditions = self._expense_conditions(
             owner_id, categories, people, date_from, date_to
@@ -126,7 +128,16 @@ class DatasetRepository:
             self._session.scalar(select(func.count()).select_from(statement.subquery()))
             or 0
         )
-        query = statement.order_by(ExpenseRow.transaction_date.desc(), ExpenseRow.id)
+        field = {
+            "date": ExpenseRow.transaction_date,
+            "amount": ExpenseRow.amount,
+            "who": ExpenseRow.who,
+            "category": ExpenseRow.category,
+            "description": ExpenseRow.description,
+        }[sort_by]
+        query = statement.order_by(
+            field.asc() if sort_direction == "asc" else field.desc(), ExpenseRow.id
+        )
         if offset:
             query = query.offset(offset)
         if limit is not None:

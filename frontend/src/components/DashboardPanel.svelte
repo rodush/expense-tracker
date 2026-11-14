@@ -1,4 +1,5 @@
 <script>
+  import { formatAmount } from "../money";
   import { onDestroy } from "svelte";
   import { createOrUpdateCategoryChart, destroyCategoryChart } from "../chart";
 
@@ -55,13 +56,6 @@
     }
   });
 
-  function formatAmount(amount) {
-    return new Intl.NumberFormat(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(Number(amount));
-  }
-
   function sortItems(items, sort) {
     return [...items].sort((left, right) => {
       const a = left[sort.key];
@@ -95,6 +89,19 @@
       <h2 id="dashboardHeading">Spending overview</h2>
     </div>
   </header>
+
+  {#if summary && summary.expense_count > 0}
+    <article
+      class="summary-card summary-card-primary total-spend-card"
+      aria-label="Total spend"
+    >
+      <span class="metric-icon" aria-hidden="true">↗</span>
+      <p class="metric-label">Total spend</p>
+      <p id="totalAmount" class="metric-value">
+        {formatAmount(summary.total_amount)}
+      </p>
+    </article>
+  {/if}
 
   <details class="filter-card" aria-labelledby="filterHeading" open>
     <summary class="filter-card-summary">
@@ -161,6 +168,10 @@
           </div>
         </fieldset>
       </div>
+      <p class="file-help">
+        Choose a date range or a quick month/year. Changing one clears the
+        other.
+      </p>
       <div class="date-filters">
         <fieldset class="filter-group date-range-group">
           <legend>Date range</legend>
@@ -169,8 +180,17 @@
             <input
               aria-label="From date"
               type="date"
-              bind:value={dateFrom}
-              oninput={() => onfilterchange?.("range")}
+              aria-invalid={dateFrom && dateTo && dateFrom > dateTo
+                ? "true"
+                : undefined}
+              aria-describedby={dateFrom && dateTo && dateFrom > dateTo
+                ? "reportError"
+                : undefined}
+              value={dateFrom}
+              onchange={(event) => {
+                dateFrom = event.currentTarget.value;
+                onfilterchange?.("range");
+              }}
             />
           </label>
           <label>
@@ -178,8 +198,17 @@
             <input
               aria-label="To date"
               type="date"
-              bind:value={dateTo}
-              oninput={() => onfilterchange?.("range")}
+              aria-invalid={dateFrom && dateTo && dateFrom > dateTo
+                ? "true"
+                : undefined}
+              aria-describedby={dateFrom && dateTo && dateFrom > dateTo
+                ? "reportError"
+                : undefined}
+              value={dateTo}
+              onchange={(event) => {
+                dateTo = event.currentTarget.value;
+                onfilterchange?.("range");
+              }}
             />
           </label>
         </fieldset>
@@ -228,15 +257,7 @@
     </div>
   </details>
 
-  {#if summary?.expense_count === 0}
-    <p id="dashboardEmpty" class="empty-state" role="status">
-      <strong>No expenses match these filters.</strong>
-      <span>
-        Try choosing different options or clear the filters to see everything.
-      </span>
-    </p>
-  {/if}
-  {#if summary}
+  {#if summary && summary.expense_count > 0}
     <div id="dashboardContent" class="report-grid">
       <div class="breakdown-grid">
         <section class="breakdown-card" aria-labelledby="categoryHeading">
@@ -250,10 +271,11 @@
             <canvas
               bind:this={categoryChartCanvas}
               id="categoryChart"
-              aria-label="Doughnut chart showing spending by category"
+              aria-describedby="categoryTable"
+              aria-label="Spending by category in EUR. Exact values in the category totals table."
             ></canvas>
           </div>
-          <details class="category-totals">
+          <details class="category-totals" open>
             <summary>Spending totals by category</summary>
             <div class="table-scroll">
               <table id="categoryTable">
@@ -263,7 +285,14 @@
                 <thead>
                   <tr>
                     {#each [["name", "Category"], ["amount", "Amount"], ["count", "Count"]] as [key, label] (key)}
-                      <th scope="col">
+                      <th
+                        scope="col"
+                        aria-sort={categorySort.key === key
+                          ? categorySort.direction === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"}
+                      >
                         <button
                           class="sort-button"
                           aria-label={`Sort by ${label}`}
@@ -312,7 +341,14 @@
                 <thead>
                   <tr>
                     {#each [["name", "Person"], ["amount", "Amount"], ["count", "Count"]] as [key, label] (key)}
-                      <th scope="col">
+                      <th
+                        scope="col"
+                        aria-sort={whoSort.key === key
+                          ? whoSort.direction === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"}
+                      >
                         <button
                           class="sort-button"
                           aria-label={`Sort by ${label}`}
@@ -345,16 +381,6 @@
               </table>
             </div>
           </section>
-          <article
-            class="summary-card summary-card-primary total-spend-card"
-            aria-label="Total spend"
-          >
-            <span class="metric-icon" aria-hidden="true">↗</span>
-            <p class="metric-label">Total spend</p>
-            <p id="totalAmount" class="metric-value">
-              {formatAmount(summary.total_amount)}
-            </p>
-          </article>
         </div>
       </div>
     </div>

@@ -83,6 +83,8 @@ class LedgerStoreBackend(DatasetStoreBackend, Protocol):
         date_to: date | None = None,
         offset: int = 0,
         limit: int | None = 100,
+        sort_by: str = "date",
+        sort_direction: str = "desc",
     ) -> tuple[list[dict[str, Any]], int]: ...
 
     def summarize_expenses(
@@ -179,6 +181,8 @@ class DatasetStore:
         date_to: date | None = None,
         offset: int = 0,
         limit: int | None = 100,
+        sort_by: str = "date",
+        sort_direction: str = "desc",
     ) -> tuple[list[dict[str, Any]], int]:
         selected_categories = set(categories)
         selected_people = set(people)
@@ -194,7 +198,14 @@ class DatasetStore:
             and (date_from is None or str(row.get("date", "")) >= date_from.isoformat())
             and (date_to is None or str(row.get("date", "")) <= date_to.isoformat())
         ]
-        filtered.sort(key=lambda row: str(row.get("date", "")), reverse=True)
+        filtered.sort(
+            key=lambda row: (
+                float(row.get("amount", 0))
+                if sort_by == "amount"
+                else str(row.get(sort_by, ""))
+            ),
+            reverse=sort_direction == "desc",
+        )
         total_count = len(filtered)
         page = filtered[offset:] if limit is None else filtered[offset : offset + limit]
         return page, total_count

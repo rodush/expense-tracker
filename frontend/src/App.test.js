@@ -100,7 +100,7 @@ describe("historical expense dashboard", () => {
         expect.objectContaining({ categories: ["Food"] }),
       ),
     );
-    await fireEvent.input(screen.getByLabelText("From date"), {
+    await fireEvent.change(screen.getByLabelText("From date"), {
       target: { value: "2026-01-01" },
     });
     await waitFor(() =>
@@ -168,8 +168,15 @@ describe("historical expense dashboard", () => {
     const tableRows = screen
       .getByRole("table", { name: "Expenses included in the current report" })
       .querySelectorAll("tbody tr");
-    expect(tableRows[0].textContent).toContain("Older expense");
-    expect(tableRows[1].textContent).toContain("<img src=x onerror=alert(1)>");
+    expect(fetchExpenses).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sortBy: "amount",
+        sortDirection: "asc",
+        offset: 0,
+      }),
+    );
+    expect(tableRows[0].textContent).toContain("<img src=x onerror=alert(1)>");
+    expect(tableRows[1].textContent).toContain("Older expense");
   });
 
   it("shows the selected filter count when the filters are collapsed", async () => {
@@ -188,15 +195,13 @@ describe("historical expense dashboard", () => {
     expect(screen.getByText("2 selected filters")).toBeTruthy();
   });
 
-  it("places total spend below the people breakdown and omits the transaction metric card", async () => {
+  it("leads the report with total spend", async () => {
     mockHistory();
     render(App);
     await screen.findByText("<img src=x onerror=alert(1)>");
 
     const totalSpend = screen.getByText("Total spend").closest(".summary-card");
-    expect(totalSpend.parentElement.classList.contains("people-column")).toBe(
-      true,
-    );
+    expect(totalSpend.parentElement.classList.contains("dashboard")).toBe(true);
     expect(
       screen.queryByText("Transactions", { selector: ".metric-label" }),
     ).toBeNull();
@@ -219,7 +224,7 @@ describe("historical expense dashboard", () => {
       },
     });
     await fireEvent.click(
-      screen.getByRole("button", { name: "Analyze expenses" }),
+      screen.getByRole("button", { name: "Import expenses" }),
     );
 
     expect(
@@ -233,8 +238,87 @@ describe("historical expense dashboard", () => {
     ).toBeNull();
     expect(
       screen.getAllByRole("region", { name: "Expense history" }),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(screen.getByRole("checkbox", { name: "Food" })).toBeTruthy();
     expect(container.querySelector(".upload-accordion").open).toBe(false);
   });
+});
+
+it("clears stale totals and export after a failed refresh and allows retry", async () => {
+  mockHistory();
+  render(App);
+  await screen.findByText("<img src=x onerror=alert(1)>");
+  fetchExpenses.mockRejectedValueOnce(new Error("Could not refresh"));
+  await fireEvent.click(screen.getByRole("checkbox", { name: "Food" }));
+  await screen.findByText("Could not refresh");
+  expect(screen.queryByText("Total spend")).toBeNull();
+  expect(
+    screen.queryByRole("link", { name: /Download filtered CSV/ }),
+  ).toBeNull();
+  await fireEvent.click(screen.getByRole("button", { name: "Retry report" }));
+  await screen.findByText("<img src=x onerror=alert(1)>");
+});
+
+it("shows first-import guidance and opens upload for an empty ledger", async () => {
+  mockHistory({ items: [], total_count: 0 });
+  fetchFilterOptions.mockResolvedValue({ categories: [], who: [], years: [] });
+  render(App);
+  await screen.findByText(
+    "Your ledger is empty. Import a statement to get started.",
+  );
+  expect(
+    screen.getByText("Upload an expense statement").closest("details").open,
+  ).toBe(true);
+});
+
+it("keeps filter errors independent from a successful report", async () => {
+  mockHistory();
+  fetchFilterOptions.mockRejectedValueOnce(new Error("Filters unavailable"));
+  render(App);
+  await screen.findByText("<img src=x onerror=alert(1)>");
+  expect(screen.getByText("Filters unavailable")).toBeTruthy();
+  await fireEvent.click(screen.getByRole("button", { name: "Retry filters" }));
+  await waitFor(() =>
+    expect(screen.queryByText("Filters unavailable")).toBeNull(),
+  );
+});
+
+it("rejects reversed dates without requesting a misleading report", async () => {
+  mockHistory();
+  render(App);
+  await screen.findByText("<img src=x onerror=alert(1)>");
+  await fireEvent.change(screen.getByLabelText("From date"), {
+    target: { value: "2026-02-01" },
+  });
+  const calls = fetchExpenses.mock.calls.length;
+  await fireEvent.change(screen.getByLabelText("To date"), {
+    target: { value: "2026-01-01" },
+  });
+  await screen.findByText("The start date must not be after the end date.");
+  expect(fetchExpenses.mock.calls.length).toBe(calls);
+  expect(
+    screen.queryByRole("link", { name: /Download filtered CSV/ }),
+  ).toBeNull();
+});
+
+it("ignores responses from an older filter request", async () => {
+  mockHistory();
+  render(App);
+  await screen.findByText("<img src=x onerror=alert(1)>");
+  let finish;
+  fetchExpenses.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  await fireEvent.click(screen.getByRole("checkbox", { name: "Food" }));
+  await fireEvent.click(screen.getByRole("checkbox", { name: "Travel" }));
+  await screen.findByText("<img src=x onerror=alert(1)>");
+  finish({
+    items: [{ ...rows[0], description: "Stale response" }],
+    total_count: 1,
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(screen.queryByText("Stale response")).toBeNull();
 });

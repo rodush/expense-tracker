@@ -1073,3 +1073,70 @@ body > footer.site-footer {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Constrain intrinsic table widths to their scroll areas. */
+.results,
+.dashboard,
+.report-grid,
+.breakdown-grid,
+.people-column,
+.filter-card,
+.filter-card-content,
+.filter-groups,
+.date-filters,
+.filter-group,
+.transactions,
+.table-scroll {
+  min-width: 0;
+  max-width: 100%;
+}
+.welcome.returning {
+  margin-bottom: 1rem;
+}
+.app-shell.container {
+  padding-top: 1.5rem;
+}
+.total-spend-card {
+  margin: 0 0 1.25rem;
+}
+.table-help {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.table-scroll:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+#resultsTable {
+  table-layout: auto;
+  min-width: 48rem;
+}
+#resultsTable td {
+  white-space: nowrap;
+}
+#resultsTable .description-cell {
+  min-width: 15rem;
+  max-width: 24rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.breakdown-card table {
+  min-width: 100%;
+}
+.breakdown-card td {
+  white-space: nowrap;
+}
+.breakdown-card th {
+  overflow-wrap: anywhere;
+}
+
+.chart-container {
+  min-width: 0;
+  max-width: 100%;
+}
+.chart-container canvas {
+  max-width: 100%;
+}
+#resultsTable caption {
+  text-align: left;
+}

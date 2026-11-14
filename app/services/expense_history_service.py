@@ -74,12 +74,21 @@ class ExpenseHistoryService:
         month: int | None = None,
         offset: int = 0,
         limit: int = 100,
+        sort_by: str = "date",
+        sort_direction: str = "desc",
     ) -> dict[str, Any]:
         categories, people, date_from, date_to = self._filters(
             categories, people, date_from, date_to, year, month
         )
         items, total_count = self.ledger_store.list_expenses(
-            categories, people, date_from, date_to, offset, limit
+            categories,
+            people,
+            date_from,
+            date_to,
+            offset,
+            limit,
+            sort_by,
+            sort_direction,
         )
         return {
             "items": items,
